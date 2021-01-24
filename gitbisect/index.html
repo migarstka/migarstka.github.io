@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--     <link href="https://fonts.googleapis.com/css?family=Roboto+Slab" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-134159986-1"></script>
+</head>
+<html>
+  <head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Working on a software project I often realize that I introduced a bug in one of my previous commits.Especially if the number of candidate commits for the err...">
+    <meta name="author" content="Michael Garstka">
+
+    <title>Automatic bug discovery with git bisect run</title>
+    <link rel="shortcut icon" type="image/x-icon" href="/assets/images/favicon.ico">
+    <link rel="canonical" href="https://migarstka.github.io/gitbisect/">
+
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css">
+
+    <!-- Custom style -->
+    <link href="/assets/css/academicons.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
+    <!-- MathJX -->
+    <script type="text/javascript"
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+
+
+</head>
+
+  <body id="page-top">
+      <main class="default-page-main">
+              <!-- Navbar ================================================== -->
+  <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container-fluid">
+      <!-- Brand and toggle get grouped for better mobile display -->
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+	<a class="navbar-brand" href="https://migarstka.github.io">Michael Garstka</a>
+        <!-- Show this only when navbar collapses (xs) -->
+        <a class="nav pull-right visible-xs" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_small.png" height="50" alt="University of Oxford" /></a>
+      </div>
+
+      <!-- Collect the nav links, forms, and other content for toggling -->
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        <ul class="nav navbar-nav">
+          
+          
+          
+  
+
+  
+
+  
+
+
+
+
+    </ul>
+    <!-- Show this when screen is small but navbar has not collapsed yet -->
+    <a class="nav pull-right visible-sm" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_small.png" height="50" alt="University of Oxford" /></a>
+    <!-- Show this when screen is big -->
+    <a class="nav pull-right hidden-xs hidden-sm" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_rectangle.png" height="50" alt="University of Oxford" /></a>
+    </div><!-- /.navbar-collapse -->
+  </div><!-- /.container-fluid -->
+</nav>
+
+              <div class="page-layout">
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 col-md-offset-1">
+      
+      <div class = "page-header">
+          <h1>
+              Automatic bug discovery with git bisect run
+          </h1>
+      </div>
+      <!-- <h2 class="ruled" style="margin-bottom:20px">Automatic bug discovery with git bisect run</h2> -->
+      
+      <div class="post-info">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pen" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M13.498.795l.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001zm-.644.766a.5.5 0 0 0-.707 0L1.95 11.756l-.764 3.057 3.057-.764L14.44 3.854a.5.5 0 0 0 0-.708l-1.585-1.585z"/>
+          </svg>
+        <i>Saturday, 9. January 2021 ⋅ <span class="reading-time" title="Estimated read time">
+  
+  
+    11 minute
+  
+</span>
+
+ read ⋅ tags: <span class="tagsstyle">git, julia</span></i>
+
+<!--
+
+  <div>
+            </div> -->
+      </div>
+      <div class = "page-content">
+
+      <p>Working on a software project I often realize that I introduced a bug in one of my previous commits.
+Especially if the number of candidate commits for the error is large it can be quite tedious to find the problematic commit.
+<code class="highlighter-rouge">git bisect</code> is a helpful tool to find the problematic commit using a binary search over the set of candidate commits.
+If your commit history looks like this:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>A -- B -- C -- D -- E -- F -- G -- H -- I -- HEAD
+          ^                                    ^
+         works                       doesn't work
+</code></pre>
+</div>
+<p>and you know that your code worked at commit <code class="highlighter-rouge">C</code> but not at the <code class="highlighter-rouge">HEAD</code>, Git will checkout the repository at various commits and <em>ask</em> you whether that commit causes the problems. Consequently, you’ll find the bug in <code class="highlighter-rouge">O(log(n))</code> steps where <code class="highlighter-rouge">n</code> is the number of candidate commits that could cause the error. The cool thing about <code class="highlighter-rouge">git bisect</code> is that you can provide a script to tell Git whether a certain commit is still working or not and automate the whole thing.
+Moreover, this also works for finding changes that introduce performance problems.</p>
+
+<h2 id="a-bug-in-mergesort">A bug in mergesort</h2>
+<p>I have been working on a project that implements mergesort in Julia. The project folder looks like this:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject/
+|-- merge_sort.jl
+|-- unit_test.jl
+</code></pre>
+</div>
+<p>The 
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--1" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-1" for="sidenote__checkbox--1" class="sidenote__button sidenote__button--number-1 ">files</label>
+<small id="sidenote-4" class="sidenote__content sidenote__content--number-1">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+The details of the script don’t really matter here. If you want to try and find the bug look closer at the first function <code class="highlighter-rouge">merge_sort!</code>.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span> look like this:</p>
+
+<p><strong>merge_sort.jl</strong></p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="s">"Sort array `a` using merge sort algorithm. Stable. Runtime complexity: O(n log(n)), Space complexity: O(n)."</span>
+<span class="k">function</span><span class="nf"> merge_sort</span><span class="o">!</span><span class="x">(</span><span class="n">arr</span><span class="o">::</span><span class="n">AbstractArray</span><span class="x">{</span><span class="n">T</span><span class="x">})</span> <span class="n">where</span> <span class="x">{</span><span class="n">T</span> <span class="o">&lt;:</span> <span class="n">Real</span><span class="x">}</span>
+    <span class="n">length</span><span class="x">(</span><span class="n">arr</span><span class="x">)</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="o">&amp;&amp;</span> <span class="k">return</span> <span class="n">arr</span>
+    
+    <span class="n">helper</span> <span class="o">=</span> <span class="n">similar</span><span class="x">(</span><span class="n">arr</span><span class="x">)</span>
+    <span class="n">_merge_sort!</span><span class="x">(</span><span class="n">arr</span><span class="x">,</span> <span class="mi">1</span><span class="x">,</span> <span class="n">length</span><span class="x">(</span><span class="n">arr</span><span class="x">),</span> <span class="n">helper</span><span class="x">)</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">arr</span><span class="x">[</span><span class="k">end</span><span class="x">]</span>
+    <span class="n">arr</span><span class="x">[</span><span class="k">end</span><span class="x">]</span> <span class="o">=</span> <span class="n">arr</span><span class="x">[</span><span class="mi">1</span><span class="x">]</span>
+    <span class="n">arr</span><span class="x">[</span><span class="mi">1</span><span class="x">]</span> <span class="o">=</span> <span class="n">tmp</span>
+<span class="k">end</span>
+
+<span class="s">"Split array in half and recursively call this function."</span>
+<span class="k">function</span><span class="nf"> _merge_sort</span><span class="o">!</span><span class="x">(</span><span class="n">arr</span><span class="o">::</span><span class="n">AbstractArray</span><span class="x">{</span><span class="n">T</span><span class="x">},</span> <span class="n">l</span><span class="o">::</span><span class="kt">Int64</span><span class="x">,</span> <span class="n">r</span><span class="o">::</span><span class="kt">Int64</span><span class="x">,</span> <span class="n">helper</span><span class="o">::</span><span class="n">AbstractArray</span><span class="x">{</span><span class="n">T</span><span class="x">})</span> <span class="n">where</span> <span class="x">{</span><span class="n">T</span> <span class="o">&lt;:</span> <span class="n">Real</span><span class="x">}</span>
+    <span class="c"># single element: already sorted</span>
+    <span class="k">if</span> <span class="n">r</span> <span class="o">-</span> <span class="n">l</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">nothing</span>
+    <span class="k">end</span>
+
+    <span class="c"># split list and sort individually</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">div</span><span class="x">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">l</span> <span class="o">+</span> <span class="mi">1</span><span class="x">,</span> <span class="mi">2</span><span class="x">)</span> <span class="o">+</span> <span class="n">l</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="n">_merge_sort!</span><span class="x">(</span><span class="n">arr</span><span class="x">,</span> <span class="n">l</span><span class="x">,</span> <span class="n">m</span><span class="x">,</span> <span class="n">helper</span><span class="x">)</span>
+    <span class="n">_merge_sort!</span><span class="x">(</span><span class="n">arr</span><span class="x">,</span> <span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="x">,</span> <span class="n">r</span><span class="x">,</span> <span class="n">helper</span><span class="x">)</span>
+
+    <span class="c"># merge them back together</span>
+    <span class="n">merge!</span><span class="x">(</span><span class="n">arr</span><span class="x">,</span> <span class="n">l</span><span class="x">,</span> <span class="n">m</span><span class="x">,</span> <span class="n">r</span><span class="x">,</span> <span class="n">helper</span><span class="x">)</span>
+
+<span class="k">end</span>
+
+<span class="s">"Merge two sorted arrays in sorted fashion."</span>
+<span class="k">function</span><span class="nf"> merge</span><span class="o">!</span><span class="x">(</span><span class="n">arr</span><span class="o">::</span><span class="n">AbstractArray</span><span class="x">{</span><span class="n">T</span><span class="x">},</span> <span class="n">l</span><span class="o">::</span><span class="kt">Int64</span><span class="x">,</span> <span class="n">m</span><span class="o">::</span><span class="kt">Int64</span><span class="x">,</span> <span class="n">r</span><span class="o">::</span><span class="kt">Int64</span><span class="x">,</span> <span class="n">helper</span><span class="o">::</span><span class="n">AbstractArray</span><span class="x">{</span><span class="n">T</span><span class="x">})</span> <span class="n">where</span> <span class="x">{</span><span class="n">T</span> <span class="o">&lt;:</span> <span class="n">Real</span><span class="x">}</span>    
+    <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="n">l</span><span class="x">:</span><span class="n">r</span>
+        <span class="n">helper</span><span class="x">[</span><span class="n">k</span><span class="x">]</span> <span class="o">=</span> <span class="n">arr</span><span class="x">[</span><span class="n">k</span><span class="x">]</span>
+    <span class="k">end</span>
+    <span class="n">helper_l</span> <span class="o">=</span> <span class="n">l</span>
+    <span class="n">helper_r</span> <span class="o">=</span> <span class="n">m</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">current</span> <span class="o">=</span> <span class="n">l</span>
+
+    <span class="c"># compare elements in left and right partition and copy smaller one </span>
+    <span class="k">while</span> <span class="n">helper_l</span> <span class="o">&lt;=</span> <span class="n">m</span> <span class="o">&amp;&amp;</span> <span class="n">helper_r</span> <span class="o">&lt;=</span> <span class="n">r</span>
+        <span class="k">if</span> <span class="n">helper</span><span class="x">[</span><span class="n">helper_l</span><span class="x">]</span> <span class="o">&lt;=</span> <span class="n">helper</span><span class="x">[</span><span class="n">helper_r</span><span class="x">]</span>
+            <span class="n">arr</span><span class="x">[</span><span class="n">current</span><span class="x">]</span> <span class="o">=</span> <span class="n">helper</span><span class="x">[</span><span class="n">helper_l</span><span class="x">]</span>
+            <span class="n">helper_l</span> <span class="o">+=</span> <span class="mi">1</span>            
+        <span class="k">else</span>
+            <span class="n">arr</span><span class="x">[</span><span class="n">current</span><span class="x">]</span> <span class="o">=</span> <span class="n">helper</span><span class="x">[</span><span class="n">helper_r</span><span class="x">]</span>
+            <span class="n">helper_r</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">end</span>
+        <span class="n">current</span> <span class="o">+=</span> <span class="mi">1</span> 
+    <span class="k">end</span>
+    
+    <span class="c"># transfer any left overs from left partition (greater than all elem in right partition)</span>
+    <span class="k">if</span> <span class="n">helper_l</span> <span class="o">&lt;=</span> <span class="n">m</span> 
+         <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="n">helper_l</span><span class="x">:</span><span class="n">m</span>
+            <span class="n">arr</span><span class="x">[</span><span class="n">current</span><span class="x">]</span> <span class="o">=</span> <span class="n">helper</span><span class="x">[</span><span class="n">k</span><span class="x">]</span>
+            <span class="n">current</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">end</span>
+    <span class="k">end</span>
+<span class="k">end</span></code></pre></figure>
+
+<p>Unfortunately, the corresponding unit test <strong>unit_test.jl</strong> for the <code class="highlighter-rouge">merge_sort!</code> function fails:</p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="c"># import code</span>
+<span class="n">include</span><span class="x">(</span><span class="s">"./merge_sort.jl"</span><span class="x">)</span>
+
+<span class="c"># test merge sort code</span>
+<span class="n">using</span> <span class="n">Test</span>
+
+<span class="nd">@testset</span> <span class="s">"Test Merge Sort"</span> <span class="n">begin</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span><span class="x">:</span><span class="mi">3</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">100.</span> <span class="o">*</span> <span class="n">randn</span><span class="x">(</span><span class="mi">10000</span><span class="x">)</span> <span class="o">.-</span> <span class="mf">500.</span>
+        <span class="n">merge_sort!</span><span class="x">(</span><span class="n">a</span><span class="x">)</span>
+        <span class="nd">@test</span> <span class="n">issorted</span><span class="x">(</span><span class="n">a</span><span class="x">)</span>
+    <span class="k">end</span>
+<span class="k">end</span></code></pre></figure>
+
+<p>Let’s take a look at the previous commits to see if we can figure out which commit might cause the problem.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git log --pretty=oneline
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>cb67f4062dfc16f35cbd91a53582c1655705818d (HEAD -&gt; master) Change deepcopy back to similar
+1327949703a06918d62198ea34b5a47d36f3a90f Use deepcopy instead of similar
+2c84ffd5916809ba1ca922b749ecede7c5f0139c Remove loop annotation
+2659d69af012edefc2c444f9ae4556711f7dcb65 [*] Swap first and last element
+2783ba6cc0f5cd5db33b5879eb54547743e6fd8c Make if-statement one-liner
+86f3851d0ff4838567dbcb265ed07c6b8ef143fd Add function documentation
+0d1c8b0fa1aed40ee7fc2f60f2f1d006b849f59e Add unit test
+c5b68639402ff014264faf82e7b61beaf446a1ae Initial commit
+</code></pre>
+</div>
+<p>It
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--2" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-2" for="sidenote__checkbox--2" class="sidenote__button sidenote__button--number-2 ">does not seem obvious.</label>
+<small id="sidenote-2" class="sidenote__content sidenote__content--number-2">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+Okay, it is fairly obvious. The problematic commit is the one marked <code class="highlighter-rouge">[*]</code>.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span>I only remember that the code in the first commit <code class="highlighter-rouge">c5b6863</code> still worked and in the current commit <code class="highlighter-rouge">HEAD</code> it does not.</p>
+
+<h2 id="manual-git-bisect">Manual git bisect</h2>
+<p>We use <code class="highlighter-rouge">git bisect</code> to start the search for the broken commit:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect start
+</code></pre>
+</div>
+<p>Next, we give Git the boundary of the search range, i.e. one commit that is bad (the current one):</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect bad HEAD
+</code></pre>
+</div>
+
+<p>and one commit that worked:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect good c5b6863
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Bisecting: 3 revisions left to test after this (roughly 2 steps)
+[2783ba6cc0f5cd5db33b5879eb54547743e6fd8c] Make if-statement one-liner
+</code></pre>
+</div>
+<p>Git will now go through the range, checkout different commits and ask us if the commit is good or bad. As you can see it first checks out the commit in the middle of the interval <code class="highlighter-rouge">2783ba6</code>. I run <code class="highlighter-rouge">unit_test.jl</code> and the code still works. I tell Git this by using:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect good
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Bisecting: 1 revision left to test after this (roughly 1 step)
+[2c84ffd5916809ba1ca922b749ecede7c5f0139c] Remove loop annotation
+</code></pre>
+</div>
+<p>Next, Git checked out the middle commit <code class="highlighter-rouge">2c84ff</code> in the remaining interval. After running the unit test I realize that the test fails, so I tell Git:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect bad
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[2659d69af012edefc2c444f9ae4556711f7dcb65] [*] Swap first and last element
+</code></pre>
+</div>
+<p>It checks out another commit. I try the unit tests and they fail again, so I again use:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect bad
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>2659d69af012edefc2c444f9ae4556711f7dcb65 is the first bad commit
+commit 2659d69af012edefc2c444f9ae4556711f7dcb65
+Author: Michael 
+Date:   Sat Jan 9 14:46:32 2021 +0000
+
+    [*] Swap first and last element
+
+ merge_sort.jl | 3 +++
+ 1 file changed, 3 insertions(+)
+</code></pre>
+</div>
+<p>The broken commit has been determined. Looking closer at what I did in that commit,</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject ((no branch, bisect started on master))🚀 $ git show
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="gh">diff --git a/merge_sort.jl b/merge_sort.jl
+index 0fc13fd..1b41564 100644
+</span><span class="gd">--- a/merge_sort.jl
+</span><span class="gi">+++ b/merge_sort.jl
+</span><span class="gu">@@ -4,6 +4,9 @@ function merge_sort!(a::AbstractArray{T}) where {T &lt;: Real}
+</span>
+     helper = similar(a)
+     _merge_sort!(a, 1, length(a), helper)
+<span class="gi">+    tmp = a[end]
++    a[end] = a[1]
++    a[1] = tmp
+</span> end
+</code></pre>
+</div>
+
+<p>I can see that I accidentally swapped the first and last element of the array after sorting it. If at any point during the search process I had misclassified a commit, I could have stopped the search with <code class="highlighter-rouge">git bisect reset</code>.</p>
+
+<h2 id="automatic-git-bisect">Automatic git bisect</h2>
+
+<p>We can make our lifes easier by providing a script that tests each commit during the bisection process and tells Git if the commit is good or bad.
+The syntax for this is <code class="highlighter-rouge">git bisect run my_script arguments</code>.
+In this example we can simply use our unit test as the script:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect start
+MergeSortProject (master)🚀 $ git bisect bad HEAD
+MergeSortProject (master)🚀 $ git bisect good c5b6863
+MergeSortProject (master)🚀 $ git bisect run julia unit_test.jl
+</code></pre>
+</div>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">running julia unit_test.jl
+Test Summary: | Pass  Total
+Merge Sort    |    3      3
+Bisecting: 1 revision left to <span class="nb">test </span>after this <span class="o">(</span>roughly 1 step<span class="o">)</span>
+<span class="o">[</span>2c84ffd5916809ba1ca922b749ecede7c5f0139c] Remove loop annotation
+running julia unit_test.jl
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Summary:   | Fail  Total
+Test Merge Sort |    3      3
+ERROR: LoadError: Some tests did not pass: 0 passed, 3 failed, 0 errored, 0 broken.
+<span class="k">in </span>expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:7
+Bisecting: 0 revisions left to <span class="nb">test </span>after this <span class="o">(</span>roughly 0 steps<span class="o">)</span>
+<span class="o">[</span>2659d69af012edefc2c444f9ae4556711f7dcb65] <span class="o">[</span><span class="k">*</span><span class="o">]</span> Swap first and last element
+running julia unit_test.jl
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted<span class="o">(</span>a<span class="o">)</span>
+Stacktrace:
+ <span class="o">[</span>1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 <span class="o">[</span>inlined]
+ <span class="o">[</span>2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 <span class="o">[</span>inlined]
+ <span class="o">[</span>3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Summary: | Fail  Total
+Merge Sort    |    3      3
+ERROR: LoadError: Some tests did not pass: 0 passed, 3 failed, 0 errored, 0 broken.
+<span class="k">in </span>expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:7
+2659d69af012edefc2c444f9ae4556711f7dcb65 is the first bad commit
+commit 2659d69af012edefc2c444f9ae4556711f7dcb65
+Author: Michael 
+Date:   Sat Jan 9 14:46:32 2021 +0000
+
+    <span class="o">[</span><span class="k">*</span><span class="o">]</span> Swap first and last element
+
+ merge_sort.jl | 3 +++
+ 1 file changed, 3 insertions<span class="o">(</span>+<span class="o">)</span>
+bisect run success</code></pre></figure>
+
+<p>The output shows that the unit test passes on the first suggested commit and then fails twice, which correctly identifies the broken commit <code class="highlighter-rouge">[*] Swap first and last element</code> as before.</p>
+
+<p>In this example the unit test file <code class="highlighter-rouge">unit_test.jl</code> is also tracked in the repository. Only use a tracked script if you are sure that the script itself does not introduce the problem or was changed severely by one of the commits.</p>
+
+<h2 id="finding-performance-digressions">Finding performance digressions</h2>
+<p>Above workflow is not only useful to find bugs.
+It can also be used to find commits that reduce the performance of our code.</p>
+
+<p>After finding the bug in the previous section, I committed a fix (<code class="highlighter-rouge">a53c36</code>). I also benchmarked my code and found that it takes <code class="highlighter-rouge">108.5μs</code> to sort an array of length <code class="highlighter-rouge">5000</code>. After working a bit longer on the code I realize that the code has noticeably slowed down. Sorting the same array now takes <code class="highlighter-rouge">122.2ms</code>. All the unit tests still pass, so one of my changes must cause the slowdown.
+Let’s look again at the commit log:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git log --pretty=oneline
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>4fdadbc9304bea5e9db90267fbc36ce12b7fffca (HEAD -&gt; master) Add comment on function call
+4c47b70d0cc90630460bc5f744338767972d475f [**] Don't reuse helper
+be3c1deb31b1f1595338f09f495dae72937abf7e Rename `merge!` to `_merge!`
+1d96d60a3927f7eaaca13a282137bca87b785818 Make if-stament oneliner
+a53c361b69efc45780ac90cacf8d51ab00a0f0fc Fix bug found using git bisect
+cb67f4062dfc16f35cbd91a53582c1655705818d Change deepcopy back to similar
+1327949703a06918d62198ea34b5a47d36f3a90f Use deepcopy instead of similar
+2c84ffd5916809ba1ca922b749ecede7c5f0139c Remove loop annotation
+2659d69af012edefc2c444f9ae4556711f7dcb65 [*] Swap first and last element
+2783ba6cc0f5cd5db33b5879eb54547743e6fd8c Make if-statement one-liner
+86f3851d0ff4838567dbcb265ed07c6b8ef143fd Add function documentation
+0d1c8b0fa1aed40ee7fc2f60f2f1d006b849f59e Add unit test
+c5b68639402ff014264faf82e7b61beaf446a1ae Initial commit
+</code></pre>
+</div>
+
+<p>I can use <code class="highlighter-rouge">git bisect</code> to find the commit that is causing the performance issues by writing a script that benchmarks the sorting algorithm and compares it to a target time plus some tolerance. If the test passes the commit is classified as good and as bad otherwise. We can use the following script:
+<strong>time_code.jl</strong></p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="n">using</span> <span class="n">BenchmarkTools</span><span class="x">,</span> <span class="n">Test</span><span class="x">,</span> <span class="n">Random</span>
+<span class="n">include</span><span class="x">(</span><span class="s">"./merge_sort.jl"</span><span class="x">)</span>
+
+<span class="c"># run benchmark</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">Random</span><span class="o">.</span><span class="n">MersenneTwister</span><span class="x">(</span><span class="mi">1</span><span class="x">)</span>
+<span class="n">a</span> <span class="o">=</span> <span class="mf">100.</span> <span class="o">*</span> <span class="n">randn</span><span class="x">(</span><span class="n">rng</span><span class="x">,</span> <span class="mi">5000</span><span class="x">)</span> <span class="o">.-</span> <span class="mf">500.</span>
+<span class="n">min_time</span> <span class="o">=</span> <span class="nd">@belapsed</span> <span class="n">merge_sort!</span><span class="x">(</span><span class="o">$</span><span class="n">a</span><span class="x">)</span>
+<span class="n">tol</span> <span class="o">=</span> <span class="mf">1.1</span>
+<span class="n">target_time</span> <span class="o">=</span> <span class="n">parse</span><span class="x">(</span><span class="kt">Float64</span><span class="x">,</span> <span class="n">ARGS</span><span class="x">[</span><span class="mi">1</span><span class="x">])</span>
+
+<span class="n">println</span><span class="x">(</span><span class="s">"Benchmark time: </span><span class="si">$(min_time) </span><span class="s">vs. target time (+tol): </span><span class="si">$</span><span class="s">(tol * target_time)"</span><span class="x">)</span>
+<span class="nd">@test</span> <span class="n">min_time</span> <span class="o">&lt;</span> <span class="n">tol</span> <span class="o">*</span> <span class="n">target_time</span></code></pre></figure>
+
+<p>Next, we run the bisection and pass our target time (<code class="highlighter-rouge">108.5μs</code>) to the script.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect start
+MergeSortProject (master)🚀 $ git bisect bad HEAD
+MergeSortProject (master)🚀 $ git bisect good a53c361
+MergeSortProject (master)🚀 $ git bisect run julia time_code.jl 0.000108514
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject (master)🚀 $ git bisect run julia time_code.jl  0.000108514
+running julia time_code.jl 0.000108514
+Benchmark time: 0.000105667 vs. target time (+tol): 0.00011936540000000001
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[4c47b70d0cc90630460bc5f744338767972d475f] [**] Don't reuse helper
+running julia time_code.jl 0.000108514
+Benchmark time: 0.1221385 vs. target time (+tol): 0.00011936540000000001
+Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/time_code.jl:12
+  Expression: min_time &lt; tol * target_time
+   Evaluated: 0.1221385 &lt; 0.00011936540000000001
+ERROR: LoadError: There was an error during testing
+in expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/time_code.jl:12
+4c47b70d0cc90630460bc5f744338767972d475f is the first bad commit
+commit 4c47b70d0cc90630460bc5f744338767972d475f
+Author: Michael Garstka &lt;michael@garstka.org&gt;
+Date:   Tue Jan 12 22:40:24 2021 +0000
+
+    [**] Don't reuse helper
+
+ merge_sort.jl | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
+bisect run success
+</code></pre>
+</div>
+<p>We can take a closer look at the identified commit:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MergeSortProject ((no branch, bisect started on master))🚀 $ git show 4c47b70d0
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="gh">diff --git a/merge_sort.jl b/merge_sort.jl
+index e6f4439..4ae0234 100644
+</span><span class="gd">--- a/merge_sort.jl
+</span><span class="gi">+++ b/merge_sort.jl
+</span><span class="gu">@@ -2,13 +2,13 @@
+</span> function merge_sort!(arr::AbstractArray{T}) where {T &lt;: Real}
+     length(arr) &lt;= 1 &amp;&amp; return arr
+
+<span class="gd">-    helper = similar(arr)
+-    _merge_sort!(arr, 1, length(arr), helper)
+</span><span class="gi">+
++    _merge_sort!(arr, 1, length(arr))
+</span>
+ end
+
+ "Split array and half and recursively call this function."
+<span class="gd">-function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64, helper::AbstractArray{T}) where {T &lt;: Real}
+</span><span class="gi">+function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64) where {T &lt;: Real}
+</span>     # single element: already sorted
+     r - l &lt;= 0 &amp;&amp; return nothing
+
+<span class="gu">@@ -16,19 +16,18 @@ function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64, helper::Abstrac
+</span>     # split list and sort individually
+     m = div(r - l + 1, 2) + l - 1
+
+<span class="gd">-    _merge_sort!(arr, l, m, helper)
+-    _merge_sort!(arr, m + 1, r, helper)
+</span><span class="gi">+    _merge_sort!(arr, l, m)
++    _merge_sort!(arr, m + 1, r)
+</span>
+     # merge them back together
+<span class="gd">-    _merge!(arr, l, m, r, helper)
+</span><span class="gi">+    _merge!(arr, l, m, r)
+</span>
+ end
+
+ "Merge two sorted arrays in sorted fashion."
+<span class="gd">-function _merge!(arr::AbstractArray{T}, l::Int64, m::Int64, r::Int64, helper::AbstractArray{T}) where {T &lt;: Real}
+-    for k = l:r
+-        helper[k] = arr[k]
+-    end
+</span><span class="gi">+function _merge!(arr::AbstractArray{T}, l::Int64, m::Int64, r::Int64) where {T &lt;: Real}
++    helper = deepcopy(arr)
++
+</span>     helper_l = l
+     helper_r = m + 1
+     current = l
+</code></pre>
+</div>
+<p>And indeed, that commit introduced repeated allocation of the <code class="highlighter-rouge">helper</code> array in <code class="highlighter-rouge">_merge!</code> which causes the slowdown of the algorithm.</p>
+
+
+
+        <div class="post-email">
+          <i>Comments / questions / mistakes? Please get in touch with me via <a href="mailto: michael.garstka@eng.ox.ac.uk">email</a> (<a href="https://keys.openpgp.org/search?q=michael.garstka@eng.ox.ac.uk">public key</a>).</i>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+      </main>
+    
+    <!-- Footer ================================================== -->
+    <footer>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    <!-- <div class="col-md-3 col-md-offset-3 text-center"> -->
+                        <a href="mailto:michael.garstka@eng.ox.ac.uk"><i class="fa fa-envelope-square fa-3x"></i></a>
+                        <a href="http://www.linkedin.com/in/michaelgarstka/"><i class="fa fa-linkedin-square fa-3x" aria-hidden="true"></i></a>
+                         <a href="https://www.github.com/migarstka"><i class="fa fa-github-square fa-3x"></i></a>
+                         <a href="/feed.xml"><i class="fa fa-rss-square fa-3x"></i></a>
+
+                          <p class="copyright">&copy; <script>document.write(new Date().getFullYear())</script> <a href="https://migarstka.github.io">Michael Garstka</a></p>
+                    <!-- </div> -->
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mathjax -->
+    <script type="text/javascript"
+    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+
+    <!-- Google Analytics -->
+    <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '', 'auto');
+    ga('send', 'pageview');
+    </script>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+    
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-134159986-1');
+</script>
+
+    
+  </body>
+</html>

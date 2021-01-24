@@ -1,0 +1,705 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.3.1">Jekyll</generator><link href="https://migarstka.github.io/feed.xml" rel="self" type="application/atom+xml" /><link href="https://migarstka.github.io/" rel="alternate" type="text/html" /><updated>2021-01-12T23:49:40+00:00</updated><id>https://migarstka.github.io/feed.xml</id><title type="html">Michael Garstka - University of Oxford</title><subtitle>Doctoral Student in the Control Group, Department of Engineering, University of Oxford</subtitle><entry><title type="html">Automatic bug discovery with git bisect run</title><link href="https://migarstka.github.io/gitbisect/" rel="alternate" type="text/html" title="Automatic bug discovery with git bisect run" /><published>2021-01-09T00:00:00+00:00</published><updated>2021-01-09T00:00:00+00:00</updated><id>https://migarstka.github.io/git_bisect</id><content type="html" xml:base="https://migarstka.github.io/gitbisect/">&lt;p&gt;Working on a software project I often realize that I introduced a bug in one of my previous commits.
+Especially if the number of candidate commits for the error is large it can be quite tedious to find the problematic commit.
+&lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect&lt;/code&gt; is a helpful tool to find the problematic commit using a binary search over the set of candidate commits.
+If your commit history looks like this:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;A -- B -- C -- D -- E -- F -- G -- H -- I -- HEAD
+          ^                                    ^
+         works                       doesn't work
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;and you know that your code worked at commit &lt;code class=&quot;highlighter-rouge&quot;&gt;C&lt;/code&gt; but not at the &lt;code class=&quot;highlighter-rouge&quot;&gt;HEAD&lt;/code&gt;, Git will checkout the repository at various commits and &lt;em&gt;ask&lt;/em&gt; you whether that commit causes the problems. Consequently, you’ll find the bug in &lt;code class=&quot;highlighter-rouge&quot;&gt;O(log(n))&lt;/code&gt; steps where &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt; is the number of candidate commits that could cause the error. The cool thing about &lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect&lt;/code&gt; is that you can provide a script to tell Git whether a certain commit is still working or not and automate the whole thing.
+Moreover, this also works for finding changes that introduce performance problems.&lt;/p&gt;
+
+&lt;h2 id=&quot;a-bug-in-mergesort&quot;&gt;A bug in mergesort&lt;/h2&gt;
+&lt;p&gt;I have been working on a project that implements mergesort in Julia. The project folder looks like this:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject/
+|-- merge_sort.jl
+|-- unit_test.jl
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;The 
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--1&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-1&quot; for=&quot;sidenote__checkbox--1&quot; class=&quot;sidenote__button sidenote__button--number-1 &quot;&gt;files&lt;/label&gt;
+&lt;small id=&quot;sidenote-4&quot; class=&quot;sidenote__content sidenote__content--number-1&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+The details of the script don’t really matter here. If you want to try and find the bug look closer at the first function &lt;code class=&quot;highlighter-rouge&quot;&gt;merge_sort!&lt;/code&gt;.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt; look like this:&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;merge_sort.jl&lt;/strong&gt;&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;s&quot;&gt;&quot;Sort array `a` using merge sort algorithm. Stable. Runtime complexity: O(n log(n)), Space complexity: O(n).&quot;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; merge_sort&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;AbstractArray&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;})&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;where&lt;/span&gt; &lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Real&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;
+    
+    &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;similar&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;_merge_sort!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;tmp&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tmp&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+&lt;span class=&quot;s&quot;&gt;&quot;Split array in half and recursively call this function.&quot;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; _merge_sort&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;AbstractArray&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;},&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;AbstractArray&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;})&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;where&lt;/span&gt; &lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Real&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;c&quot;&gt;# single element: already sorted&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nothing&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+    &lt;span class=&quot;c&quot;&gt;# split list and sort individually&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;div&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;_merge_sort!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;_merge_sort!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;c&quot;&gt;# merge them back together&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;merge!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+&lt;span class=&quot;s&quot;&gt;&quot;Merge two sorted arrays in sorted fashion.&quot;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; merge&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;AbstractArray&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;},&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;AbstractArray&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;})&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;where&lt;/span&gt; &lt;span class=&quot;x&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Real&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;    
+    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;helper_r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;current&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;l&lt;/span&gt;
+
+    &lt;span class=&quot;c&quot;&gt;# compare elements in left and right partition and copy smaller one &lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper_r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;r&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;helper_r&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;current&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;            
+        &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;current&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;helper_r&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;helper_r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;current&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt; 
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+    
+    &lt;span class=&quot;c&quot;&gt;# transfer any left overs from left partition (greater than all elem in right partition)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; 
+         &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper_l&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;m&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;current&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;helper&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;current&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Unfortunately, the corresponding unit test &lt;strong&gt;unit_test.jl&lt;/strong&gt; for the &lt;code class=&quot;highlighter-rouge&quot;&gt;merge_sort!&lt;/code&gt; function fails:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;c&quot;&gt;# import code&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;include&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;./merge_sort.jl&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;# test merge sort code&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;using&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Test&lt;/span&gt;
+
+&lt;span class=&quot;nd&quot;&gt;@testset&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;Test Merge Sort&quot;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;begin&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;3&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;100.&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;randn&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;10000&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;.-&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;500.&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;merge_sort!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;nd&quot;&gt;@test&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;issorted&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Let’s take a look at the previous commits to see if we can figure out which commit might cause the problem.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git log --pretty=oneline
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;cb67f4062dfc16f35cbd91a53582c1655705818d (HEAD -&amp;gt; master) Change deepcopy back to similar
+1327949703a06918d62198ea34b5a47d36f3a90f Use deepcopy instead of similar
+2c84ffd5916809ba1ca922b749ecede7c5f0139c Remove loop annotation
+2659d69af012edefc2c444f9ae4556711f7dcb65 [*] Swap first and last element
+2783ba6cc0f5cd5db33b5879eb54547743e6fd8c Make if-statement one-liner
+86f3851d0ff4838567dbcb265ed07c6b8ef143fd Add function documentation
+0d1c8b0fa1aed40ee7fc2f60f2f1d006b849f59e Add unit test
+c5b68639402ff014264faf82e7b61beaf446a1ae Initial commit
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;It
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--2&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-2&quot; for=&quot;sidenote__checkbox--2&quot; class=&quot;sidenote__button sidenote__button--number-2 &quot;&gt;does not seem obvious.&lt;/label&gt;
+&lt;small id=&quot;sidenote-2&quot; class=&quot;sidenote__content sidenote__content--number-2&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+Okay, it is fairly obvious. The problematic commit is the one marked &lt;code class=&quot;highlighter-rouge&quot;&gt;[*]&lt;/code&gt;.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt;I only remember that the code in the first commit &lt;code class=&quot;highlighter-rouge&quot;&gt;c5b6863&lt;/code&gt; still worked and in the current commit &lt;code class=&quot;highlighter-rouge&quot;&gt;HEAD&lt;/code&gt; it does not.&lt;/p&gt;
+
+&lt;h2 id=&quot;manual-git-bisect&quot;&gt;Manual git bisect&lt;/h2&gt;
+&lt;p&gt;We use &lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect&lt;/code&gt; to start the search for the broken commit:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect start
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;Next, we give Git the boundary of the search range, i.e. one commit that is bad (the current one):&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect bad HEAD
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;and one commit that worked:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect good c5b6863
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Bisecting: 3 revisions left to test after this (roughly 2 steps)
+[2783ba6cc0f5cd5db33b5879eb54547743e6fd8c] Make if-statement one-liner
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;Git will now go through the range, checkout different commits and ask us if the commit is good or bad. As you can see it first checks out the commit in the middle of the interval &lt;code class=&quot;highlighter-rouge&quot;&gt;2783ba6&lt;/code&gt;. I run &lt;code class=&quot;highlighter-rouge&quot;&gt;unit_test.jl&lt;/code&gt; and the code still works. I tell Git this by using:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect good
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Bisecting: 1 revision left to test after this (roughly 1 step)
+[2c84ffd5916809ba1ca922b749ecede7c5f0139c] Remove loop annotation
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;Next, Git checked out the middle commit &lt;code class=&quot;highlighter-rouge&quot;&gt;2c84ff&lt;/code&gt; in the remaining interval. After running the unit test I realize that the test fails, so I tell Git:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect bad
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[2659d69af012edefc2c444f9ae4556711f7dcb65] [*] Swap first and last element
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;It checks out another commit. I try the unit tests and they fail again, so I again use:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject ((no branch, bisect started on master))🚀 $ git bisect bad
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;2659d69af012edefc2c444f9ae4556711f7dcb65 is the first bad commit
+commit 2659d69af012edefc2c444f9ae4556711f7dcb65
+Author: Michael 
+Date:   Sat Jan 9 14:46:32 2021 +0000
+
+    [*] Swap first and last element
+
+ merge_sort.jl | 3 +++
+ 1 file changed, 3 insertions(+)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;The broken commit has been determined. Looking closer at what I did in that commit,&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject ((no branch, bisect started on master))🚀 $ git show
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gh&quot;&gt;diff --git a/merge_sort.jl b/merge_sort.jl
+index 0fc13fd..1b41564 100644
+&lt;/span&gt;&lt;span class=&quot;gd&quot;&gt;--- a/merge_sort.jl
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+++ b/merge_sort.jl
+&lt;/span&gt;&lt;span class=&quot;gu&quot;&gt;@@ -4,6 +4,9 @@ function merge_sort!(a::AbstractArray{T}) where {T &amp;lt;: Real}
+&lt;/span&gt;
+     helper = similar(a)
+     _merge_sort!(a, 1, length(a), helper)
+&lt;span class=&quot;gi&quot;&gt;+    tmp = a[end]
++    a[end] = a[1]
++    a[1] = tmp
+&lt;/span&gt; end
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;I can see that I accidentally swapped the first and last element of the array after sorting it. If at any point during the search process I had misclassified a commit, I could have stopped the search with &lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect reset&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;automatic-git-bisect&quot;&gt;Automatic git bisect&lt;/h2&gt;
+
+&lt;p&gt;We can make our lifes easier by providing a script that tests each commit during the bisection process and tells Git if the commit is good or bad.
+The syntax for this is &lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect run my_script arguments&lt;/code&gt;.
+In this example we can simply use our unit test as the script:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect start
+MergeSortProject (master)🚀 $ git bisect bad HEAD
+MergeSortProject (master)🚀 $ git bisect good c5b6863
+MergeSortProject (master)🚀 $ git bisect run julia unit_test.jl
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;running julia unit_test.jl
+Test Summary: | Pass  Total
+Merge Sort    |    3      3
+Bisecting: 1 revision left to &lt;span class=&quot;nb&quot;&gt;test &lt;/span&gt;after this &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;roughly 1 step&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2c84ffd5916809ba1ca922b749ecede7c5f0139c] Remove loop annotation
+running julia unit_test.jl
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Summary:   | Fail  Total
+Test Merge Sort |    3      3
+ERROR: LoadError: Some tests did not pass: 0 passed, 3 failed, 0 errored, 0 broken.
+&lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:7
+Bisecting: 0 revisions left to &lt;span class=&quot;nb&quot;&gt;test &lt;/span&gt;after this &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;roughly 0 steps&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2659d69af012edefc2c444f9ae4556711f7dcb65] &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;]&lt;/span&gt; Swap first and last element
+running julia unit_test.jl
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Merge Sort: Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11
+  Expression: issorted&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;a&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Stacktrace:
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;1] macro expansion at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:11 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;2] macro expansion at /Users/julia/buildbot/worker/package_macos64/build/usr/share/julia/stdlib/v1.5/Test/src/Test.jl:1115 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;inlined]
+ &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;3] top-level scope at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:8
+Test Summary: | Fail  Total
+Merge Sort    |    3      3
+ERROR: LoadError: Some tests did not pass: 0 passed, 3 failed, 0 errored, 0 broken.
+&lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/unit_test.jl:7
+2659d69af012edefc2c444f9ae4556711f7dcb65 is the first bad commit
+commit 2659d69af012edefc2c444f9ae4556711f7dcb65
+Author: Michael 
+Date:   Sat Jan 9 14:46:32 2021 +0000
+
+    &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;]&lt;/span&gt; Swap first and last element
+
+ merge_sort.jl | 3 +++
+ 1 file changed, 3 insertions&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;+&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+bisect run success&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;The output shows that the unit test passes on the first suggested commit and then fails twice, which correctly identifies the broken commit &lt;code class=&quot;highlighter-rouge&quot;&gt;[*] Swap first and last element&lt;/code&gt; as before.&lt;/p&gt;
+
+&lt;p&gt;In this example the unit test file &lt;code class=&quot;highlighter-rouge&quot;&gt;unit_test.jl&lt;/code&gt; is also tracked in the repository. Only use a tracked script if you are sure that the script itself does not introduce the problem or was changed severely by one of the commits.&lt;/p&gt;
+
+&lt;h2 id=&quot;finding-performance-digressions&quot;&gt;Finding performance digressions&lt;/h2&gt;
+&lt;p&gt;Above workflow is not only useful to find bugs.
+It can also be used to find commits that reduce the performance of our code.&lt;/p&gt;
+
+&lt;p&gt;After finding the bug in the previous section, I committed a fix (&lt;code class=&quot;highlighter-rouge&quot;&gt;a53c36&lt;/code&gt;). I also benchmarked my code and found that it takes &lt;code class=&quot;highlighter-rouge&quot;&gt;108.5μs&lt;/code&gt; to sort an array of length &lt;code class=&quot;highlighter-rouge&quot;&gt;5000&lt;/code&gt;. After working a bit longer on the code I realize that the code has noticeably slowed down. Sorting the same array now takes &lt;code class=&quot;highlighter-rouge&quot;&gt;122.2ms&lt;/code&gt;. All the unit tests still pass, so one of my changes must cause the slowdown.
+Let’s look again at the commit log:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git log --pretty=oneline
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;4fdadbc9304bea5e9db90267fbc36ce12b7fffca (HEAD -&amp;gt; master) Add comment on function call
+4c47b70d0cc90630460bc5f744338767972d475f [**] Don't reuse helper
+be3c1deb31b1f1595338f09f495dae72937abf7e Rename `merge!` to `_merge!`
+1d96d60a3927f7eaaca13a282137bca87b785818 Make if-stament oneliner
+a53c361b69efc45780ac90cacf8d51ab00a0f0fc Fix bug found using git bisect
+cb67f4062dfc16f35cbd91a53582c1655705818d Change deepcopy back to similar
+1327949703a06918d62198ea34b5a47d36f3a90f Use deepcopy instead of similar
+2c84ffd5916809ba1ca922b749ecede7c5f0139c Remove loop annotation
+2659d69af012edefc2c444f9ae4556711f7dcb65 [*] Swap first and last element
+2783ba6cc0f5cd5db33b5879eb54547743e6fd8c Make if-statement one-liner
+86f3851d0ff4838567dbcb265ed07c6b8ef143fd Add function documentation
+0d1c8b0fa1aed40ee7fc2f60f2f1d006b849f59e Add unit test
+c5b68639402ff014264faf82e7b61beaf446a1ae Initial commit
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;I can use &lt;code class=&quot;highlighter-rouge&quot;&gt;git bisect&lt;/code&gt; to find the commit that is causing the performance issues by writing a script that benchmarks the sorting algorithm and compares it to a target time plus some tolerance. If the test passes the commit is classified as good and as bad otherwise. We can use the following script:
+&lt;strong&gt;time_code.jl&lt;/strong&gt;&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;n&quot;&gt;using&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;BenchmarkTools&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Test&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Random&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;include&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;./merge_sort.jl&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;# run benchmark&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;rng&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Random&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;MersenneTwister&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;100.&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;randn&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;rng&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;5000&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;.-&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;500.&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;min_time&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nd&quot;&gt;@belapsed&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;merge_sort!&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;tol&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;1.1&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;target_time&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Float64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ARGS&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;])&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Benchmark time: &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$(min_time) &lt;/span&gt;&lt;span class=&quot;s&quot;&gt;vs. target time (+tol): &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;(tol * target_time)&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;nd&quot;&gt;@test&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;min_time&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;tol&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;target_time&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Next, we run the bisection and pass our target time (&lt;code class=&quot;highlighter-rouge&quot;&gt;108.5μs&lt;/code&gt;) to the script.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect start
+MergeSortProject (master)🚀 $ git bisect bad HEAD
+MergeSortProject (master)🚀 $ git bisect good a53c361
+MergeSortProject (master)🚀 $ git bisect run julia time_code.jl 0.000108514
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject (master)🚀 $ git bisect run julia time_code.jl  0.000108514
+running julia time_code.jl 0.000108514
+Benchmark time: 0.000105667 vs. target time (+tol): 0.00011936540000000001
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[4c47b70d0cc90630460bc5f744338767972d475f] [**] Don't reuse helper
+running julia time_code.jl 0.000108514
+Benchmark time: 0.1221385 vs. target time (+tol): 0.00011936540000000001
+Test Failed at /Users/Micha/Dropbox/Research/GitBisectExp/time_code.jl:12
+  Expression: min_time &amp;lt; tol * target_time
+   Evaluated: 0.1221385 &amp;lt; 0.00011936540000000001
+ERROR: LoadError: There was an error during testing
+in expression starting at /Users/Micha/Dropbox/Research/GitBisectExp/time_code.jl:12
+4c47b70d0cc90630460bc5f744338767972d475f is the first bad commit
+commit 4c47b70d0cc90630460bc5f744338767972d475f
+Author: Michael Garstka &amp;lt;michael@garstka.org&amp;gt;
+Date:   Tue Jan 12 22:40:24 2021 +0000
+
+    [**] Don't reuse helper
+
+ merge_sort.jl | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
+bisect run success
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;We can take a closer look at the identified commit:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MergeSortProject ((no branch, bisect started on master))🚀 $ git show 4c47b70d0
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gh&quot;&gt;diff --git a/merge_sort.jl b/merge_sort.jl
+index e6f4439..4ae0234 100644
+&lt;/span&gt;&lt;span class=&quot;gd&quot;&gt;--- a/merge_sort.jl
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+++ b/merge_sort.jl
+&lt;/span&gt;&lt;span class=&quot;gu&quot;&gt;@@ -2,13 +2,13 @@
+&lt;/span&gt; function merge_sort!(arr::AbstractArray{T}) where {T &amp;lt;: Real}
+     length(arr) &amp;lt;= 1 &amp;amp;&amp;amp; return arr
+
+&lt;span class=&quot;gd&quot;&gt;-    helper = similar(arr)
+-    _merge_sort!(arr, 1, length(arr), helper)
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+
++    _merge_sort!(arr, 1, length(arr))
+&lt;/span&gt;
+ end
+
+ &quot;Split array and half and recursively call this function.&quot;
+&lt;span class=&quot;gd&quot;&gt;-function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64, helper::AbstractArray{T}) where {T &amp;lt;: Real}
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64) where {T &amp;lt;: Real}
+&lt;/span&gt;     # single element: already sorted
+     r - l &amp;lt;= 0 &amp;amp;&amp;amp; return nothing
+
+&lt;span class=&quot;gu&quot;&gt;@@ -16,19 +16,18 @@ function _merge_sort!(arr::AbstractArray{T}, l::Int64, r::Int64, helper::Abstrac
+&lt;/span&gt;     # split list and sort individually
+     m = div(r - l + 1, 2) + l - 1
+
+&lt;span class=&quot;gd&quot;&gt;-    _merge_sort!(arr, l, m, helper)
+-    _merge_sort!(arr, m + 1, r, helper)
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+    _merge_sort!(arr, l, m)
++    _merge_sort!(arr, m + 1, r)
+&lt;/span&gt;
+     # merge them back together
+&lt;span class=&quot;gd&quot;&gt;-    _merge!(arr, l, m, r, helper)
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+    _merge!(arr, l, m, r)
+&lt;/span&gt;
+ end
+
+ &quot;Merge two sorted arrays in sorted fashion.&quot;
+&lt;span class=&quot;gd&quot;&gt;-function _merge!(arr::AbstractArray{T}, l::Int64, m::Int64, r::Int64, helper::AbstractArray{T}) where {T &amp;lt;: Real}
+-    for k = l:r
+-        helper[k] = arr[k]
+-    end
+&lt;/span&gt;&lt;span class=&quot;gi&quot;&gt;+function _merge!(arr::AbstractArray{T}, l::Int64, m::Int64, r::Int64) where {T &amp;lt;: Real}
++    helper = deepcopy(arr)
++
+&lt;/span&gt;     helper_l = l
+     helper_r = m + 1
+     current = l
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;And indeed, that commit introduced repeated allocation of the &lt;code class=&quot;highlighter-rouge&quot;&gt;helper&lt;/code&gt; array in &lt;code class=&quot;highlighter-rouge&quot;&gt;_merge!&lt;/code&gt; which causes the slowdown of the algorithm.&lt;/p&gt;</content><author><name></name></author><category term="git" /><category term="julia" /><summary type="html">Working on a software project I often realize that I introduced a bug in one of my previous commits. Especially if the number of candidate commits for the error is large it can be quite tedious to find the problematic commit. git bisect is a helpful tool to find the problematic commit using a binary search over the set of candidate commits. If your commit history looks like this:</summary></entry><entry><title type="html">Running Julia jobs on an HPC cluster</title><link href="https://migarstka.github.io/juliahpc/" rel="alternate" type="text/html" title="Running Julia jobs on an HPC cluster" /><published>2020-12-17T00:00:00+00:00</published><updated>2020-12-17T00:00:00+00:00</updated><id>https://migarstka.github.io/julia_hpc</id><content type="html" xml:base="https://migarstka.github.io/juliahpc/">&lt;p&gt;One of the bigger productivity improvements for me in terms of tweaking and benchmarking algorithms was the ability to run Julia code on my university’s HPC nodes. This allowed me to test different versions of my code in parallel while still being able to do other work on my local machine. This is a quick tutorial on how to 
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--4&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-4&quot; for=&quot;sidenote__checkbox--4&quot; class=&quot;sidenote__button sidenote__button--number-4 &quot;&gt;setup Julia &lt;/label&gt;
+&lt;small id=&quot;sidenote-4&quot; class=&quot;sidenote__content sidenote__content--number-4&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+This tutorial is intended for a Julia project, but most of the content applies if you want to run jobs in C++/R/Python/etc.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt; 
+on a computing cluster and use SLURM to manage compute jobs.&lt;/p&gt;
+
+&lt;p&gt;I am writing this based on my experience with the &lt;a href=&quot;https://www.arc.ox.ac.uk/arc-systems&quot;&gt;University of Oxford HPC  cluster&lt;/a&gt; (Arcus-HTC) which runs CentOS Linux 7 and uses &lt;a href=&quot;slurm.schedmd.com/&quot;&gt;SLURM&lt;/a&gt; for job scheduling. This means that based on your university / company setup your experience may differ. In particular the ARC login nodes are connected to the internet which makes installing Julia packages a lot easier.&lt;/p&gt;
+
+&lt;h2 id=&quot;login-and-installing-julia&quot;&gt;Login and installing Julia&lt;/h2&gt;
+&lt;p&gt;Once you have an account for Oxford ARC, connect to the University VPN and login via ssh:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;ssh -X USERNAME@oscgate.arc.ox.ac.uk&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;You’ll likely connect to one of the cluster’s login nodes. Oxford ARC has different partitions you can choose for your jobs:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Arcus-B for multi-node parallel computation&lt;/li&gt;
+  &lt;li&gt;Arcus-HTC for high-throughput lower core count jobs.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;I want to use the HTC nodes, so I will again connect to them via ssh:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;ssh -X arcus-htc&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;On the login node, two important folders were created for each user:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;$HOME/&lt;/code&gt; - points to the home directory associated with your user account&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;$DATA/&lt;/code&gt; - a folder to store larger files&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;To 
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--3&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-3&quot; for=&quot;sidenote__checkbox--3&quot; class=&quot;sidenote__button sidenote__button--number-3 &quot;&gt;install Julia &lt;/label&gt;
+&lt;small id=&quot;sidenote-3&quot; class=&quot;sidenote__content sidenote__content--number-3&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+Some version of Julia/Python/R/Matlab might already be available on ARC. Check with &lt;code class=&quot;highlighter-rouge&quot;&gt;module avail&lt;/code&gt;.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt; 
+we simply download the &lt;a href=&quot;https://julialang.org/downloads/&quot;&gt;Julia binaries&lt;/a&gt; to our &lt;code class=&quot;highlighter-rouge&quot;&gt;$DATA/&lt;/code&gt; folder and unzip them:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;nb&quot;&gt;cd&lt;/span&gt; &lt;span class=&quot;nv&quot;&gt;$DATA&lt;/span&gt;
+wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
+unzip julia-1.5.3-linux-x86_64.tar.gz&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;To run Julia on the login node we can type:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;./julia-1.5.3-linux-x86_64/bin/julia&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;(You should generally not run any significant computations on the login nodes, but it is a good way to check that everything works. Also it is a good idea to create a symlink or alias to &lt;code class=&quot;highlighter-rouge&quot;&gt;/julia-1.5.3-linux-x86_64/bin/julia&lt;/code&gt;. )&lt;/p&gt;
+
+&lt;h2 id=&quot;installing-julia-packages&quot;&gt;Installing Julia packages&lt;/h2&gt;
+&lt;p&gt;You’ll find your Julia home folder at &lt;code class=&quot;highlighter-rouge&quot;&gt;$HOME/.julia/&lt;/code&gt;. Since the ARC nodes are connected to the internet you can simply download any packages using the normal workflow. I am assuming here that we want to setup some scripts in the project folder &lt;code class=&quot;highlighter-rouge&quot;&gt;$DATA/myproject/&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;1. Run Julia
+2. Create a new project environment `activate .`
+3. Install packages: Type `]` and `pkg&amp;gt; add Statistics`
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h2 id=&quot;uploading-your-code&quot;&gt;Uploading your code&lt;/h2&gt;
+&lt;p&gt;This is a matter of taste but I prefer to be able to modify any of my code both locally and remotely. I therefore initialise &lt;code class=&quot;highlighter-rouge&quot;&gt;/myproject&lt;/code&gt; as a
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--1&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-1&quot; for=&quot;sidenote__checkbox--1&quot; class=&quot;sidenote__button sidenote__button--number-1 &quot;&gt;Git repository&lt;/label&gt;.
+&lt;small id=&quot;sidenote-1&quot; class=&quot;sidenote__content sidenote__content--number-1&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+A quick overview to get started with Git can be found &lt;a href=&quot;https://rogerdudler.github.io/git-guide/&quot;&gt;here&lt;/a&gt;. 
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt;
+I can then edit a local copy and &lt;code class=&quot;highlighter-rouge&quot;&gt;git push&lt;/code&gt; any of the local changes or vice versa. The project dependencies for this project are tracked by Julia in the  &lt;code class=&quot;highlighter-rouge&quot;&gt;Project.toml&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;Manifest.toml&lt;/code&gt; files. Changes in both files are also tracked via Git to make sure the same dependencies are used locally and remotely.&lt;/p&gt;
+
+&lt;p&gt;This setup allows me to test or debug any changes to my code locally and be certain that it will run the same way on the remote node. Debugging the code on the remote node is more time consuming because your compute jobs do not necessarily execute immediately. For example it might take several minutes until you receive the error message that you misspelled a function name.&lt;/p&gt;
+
+&lt;p&gt;Sometimes I want to upload files from my machine without tracking them via git, e.g. large dataset files like &lt;code class=&quot;highlighter-rouge&quot;&gt;dataset.csv&lt;/code&gt;. To transfer files I use &lt;code class=&quot;highlighter-rouge&quot;&gt;scp&lt;/code&gt; 
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--5&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-5&quot; for=&quot;sidenote__checkbox--5&quot; class=&quot;sidenote__button sidenote__button--number-5 &quot;&gt;(secure copy protocol)&lt;/label&gt;.
+&lt;small id=&quot;sidenote-5&quot; class=&quot;sidenote__content sidenote__content--number-5&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+Syntax: scp [OPTION] [user@SRC_HOST:]file1 [user@DEST_HOST:]file2
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt;
+To upload &lt;code class=&quot;highlighter-rouge&quot;&gt;dataset.csv&lt;/code&gt; I simply type:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;scp dataset.csv USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/.&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;To transfer a result file &lt;code class=&quot;highlighter-rouge&quot;&gt;results.csv&lt;/code&gt; back to the current folder on my local machine I can use the same command:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;scp USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/results.csv .&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;h2 id=&quot;scheduling-jobs&quot;&gt;Scheduling jobs&lt;/h2&gt;
+&lt;p&gt;Oxford ARC uses the &lt;a href=&quot;slurm.schedmd.com/&quot;&gt;SLURM&lt;/a&gt; workload manager to request and manage compute jobs. Assuming we are still in the folder &lt;code class=&quot;highlighter-rouge&quot;&gt;$DATA/myproject&lt;/code&gt; the basic workflow to create a new job is:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;write a Julia script &lt;code class=&quot;highlighter-rouge&quot;&gt;myscript.jl&lt;/code&gt; to run your code&lt;/li&gt;
+  &lt;li&gt;manage all Julia project dependencies using the environment files &lt;code class=&quot;highlighter-rouge&quot;&gt;Project.toml&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;Manifest.toml&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;write a job submission script &lt;code class=&quot;highlighter-rouge&quot;&gt;run_job.sh&lt;/code&gt; that requests compute resources and tells the compute nodes what to do&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Let’s assume we want to run the following script &lt;code class=&quot;highlighter-rouge&quot;&gt;myscript.jl&lt;/code&gt; to (inefficiently) compute and print the 20-th Fibonacci number:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;The 20-th fibonacci number is &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;(fibonacci(20)).&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;To run this script on one of the compute nodes we define a submission script &lt;code class=&quot;highlighter-rouge&quot;&gt;run_job.sh&lt;/code&gt;:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;#!/bin/bash&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;#SBATCH --time=0:05:00&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --job-name=&quot;Fibonacci_calculation&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --nodes=1&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --ntasks-per-node=1&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --partition=htc&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --output=&quot;Fibonacci.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --error=&quot;Fibonacci.err.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-type=ALL&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-user=YOUR_EMAIL_ADDRESS&lt;/span&gt;
+
+&lt;span class=&quot;nv&quot;&gt;$DATA&lt;/span&gt;/julia-1.5.3-linux-x86_64/bin/julia --project -e &lt;span class=&quot;s1&quot;&gt;'import Pkg; Pkg.instantiate();
+include(&quot;myscript.jl&quot;)'&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Lines starting with &lt;code class=&quot;highlighter-rouge&quot;&gt;#SBATCH&lt;/code&gt; are SLURM commands. We request 5min of computation time on one CPU. We further want to run it on the ARC-HTC partition and get status updates about our job sent to our email.&lt;/p&gt;
+
+&lt;p&gt;The last line in the script calls Julia, instantiates the 
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--7&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-7&quot; for=&quot;sidenote__checkbox--7&quot; class=&quot;sidenote__button sidenote__button--number-7 &quot;&gt;project environment&lt;/label&gt;,
+&lt;small id=&quot;sidenote-7&quot; class=&quot;sidenote__content sidenote__content--number-7&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+Suggested reading: &lt;a href=&quot;https://julialang.github.io/Pkg.jl/v1/environments/&quot;&gt;Working with environments&lt;/a&gt;.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt;i.e. installs any package dependencies defined in &lt;code class=&quot;highlighter-rouge&quot;&gt;Project.toml&lt;/code&gt;, and runs our script.&lt;/p&gt;
+
+&lt;p&gt;We then submit the job using the shell with&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;sbatch run_job.sh&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Depending on the available resources the job is then queued and waiting for execution. You can look up the current job status with&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;squeue -u USERNAME&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;To cancel the job use either of the two:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;scancel -j &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;JOBNUMBER]
+scancel -u &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;USERNAME]&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;h3 id=&quot;job-arrays&quot;&gt;Job arrays&lt;/h3&gt;
+&lt;p&gt;Sometimes we want to run the same job multiple times with only minor modifications, e.g. running our algorithm with one of the hyperparameters changed. For this case SLURM &lt;a href=&quot;https://slurm.schedmd.com/job_array.html&quot;&gt;job arrays&lt;/a&gt; are quite useful. They execute the submission script multiple times and allow you to run different versions of the same script.
+The ability to run time-consuming jobs in parallel can be a big time saver.
+Let’s assume that we want to calculate the Fibonacci number for &lt;code class=&quot;highlighter-rouge&quot;&gt;n = 20, 30, 40&lt;/code&gt; in separate jobs.&lt;/p&gt;
+
+&lt;p&gt;To achieve this we add one line with an array command to our submission script &lt;code class=&quot;highlighter-rouge&quot;&gt;run_job.sh&lt;/code&gt;:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;#!/bin/bash&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;#SBATCH --time=0:05:00&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --job-name=&quot;Fibonacci_calculation&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --nodes=1&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --ntasks-per-node=1&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --partition=htc&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --output=&quot;Fibonacci_%a.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --error=&quot;Fibonacci_%a.err.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-type=ALL&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-user=YOUR_EMAIL_ADDRESS&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --array=1-3&lt;/span&gt;
+
+&lt;span class=&quot;nv&quot;&gt;$DATA&lt;/span&gt;/julia-1.5.3-linux-x86_64/bin/julia --project -e &lt;span class=&quot;s1&quot;&gt;'import Pkg; Pkg.instantiate();
+include(&quot;myscript.jl&quot;)'&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;The job will now run three times. The array id is given by the environment variable&lt;code class=&quot;highlighter-rouge&quot;&gt;SLURM_ARRAY_TASK_ID&lt;/code&gt; which we can use inside our Julia script to select &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt;:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;c&quot;&gt;# get the environment variable&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;task_id&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Base&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;parse&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ENV&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;SLURM_ARRAY_TASK_ID&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;])&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;20&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;40&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;task_id&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;The &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$(n)-&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;th fibonacci number is &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;(fibonacci(n)).&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;h3 id=&quot;multithreading&quot;&gt;Multithreading&lt;/h3&gt;
+&lt;p&gt;To use multithreading in our Julia script we have to request multiple cores on a computing node. The following script &lt;code class=&quot;highlighter-rouge&quot;&gt;my_multithreaded_script.jl&lt;/code&gt; is used to compute the Fibonacci number for different &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt; on
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--6&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-6&quot; for=&quot;sidenote__checkbox--6&quot; class=&quot;sidenote__button sidenote__button--number-6 &quot;&gt;parallel threads
+&lt;/label&gt;:
+&lt;small id=&quot;sidenote-6&quot; class=&quot;sidenote__content sidenote__content--number-6&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+This is not the best example for multithreading, because computing the Fibonacci number for the highest &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt; computes the Fibonacci number for all lower &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt; in the process.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt;&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-julia&quot; data-lang=&quot;julia&quot;&gt;&lt;span class=&quot;c&quot;&gt;# check number of threads&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Number of threads: &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;(Threads.nthreads())&quot;&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;15&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;20&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;25&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;30&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;35&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;40&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt; fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Int64&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;n&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;# use multiple threads to compute the fibonacci number for each n in n_arr&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;fib&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;zeros&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;))&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;Threads&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nd&quot;&gt;@threads&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;length&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;fib&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;fibonacci&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;n_arr&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;x&quot;&gt;])&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;To run this script we use the following modified SLURM submission script:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;#!/bin/bash&lt;/span&gt;
+
+&lt;span class=&quot;c&quot;&gt;#SBATCH --time=0:05:00&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --job-name=&quot;Fibonacci_multithreaded_calculation&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --nodes=1&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --ntasks-per-node=8&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --partition=htc&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --output=&quot;Fibonacci.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --error=&quot;Fibonacci.err.out&quot;&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-type=ALL&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --mail-user=YOUR_EMAIL_ADDRESS&lt;/span&gt;
+
+&lt;span class=&quot;nb&quot;&gt;export &lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;JULIA_NUM_THREADS&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;8
+&lt;span class=&quot;nv&quot;&gt;$DATA&lt;/span&gt;/julia-1.5.3-linux-x86_64/bin/julia --project -e &lt;span class=&quot;s1&quot;&gt;'import Pkg; Pkg.instantiate();
+include(&quot;my_multithreaded_script.jl&quot;)'&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;The only changes are that we now request 8 cores on one node and export the environment variable &lt;code class=&quot;highlighter-rouge&quot;&gt;JULIA_NUM_THREADS&lt;/code&gt; to start Julia with 8 threads.&lt;/p&gt;
+
+&lt;h3 id=&quot;ensuring-consistent-results&quot;&gt;Ensuring consistent results&lt;/h3&gt;
+&lt;p&gt;Let’s assume that you want to benchmark your algorithm, e.g. measure its execution time. In order to generate consistent results from multiple runs, you have to make sure that the Julia script is executed on the same hardware every time. If no hardware is specified SLURM will just run the job on the next available node. If the node has eight CPUs and your job runs on four of them, then the performance of your job will depend on what other jobs run on the remaining four CPUs.&lt;/p&gt;
+
+&lt;p&gt;To ensure
+&lt;span class=&quot;sidenote&quot;&gt;
+&lt;input aria-label=&quot;Show sidenote&quot; type=&quot;checkbox&quot; id=&quot;sidenote__checkbox--2&quot; class=&quot;sidenote__checkbox&quot; /&gt;
+&lt;label tabindex=&quot;0&quot; title=&quot;&quot; aria-describedby=&quot;sidenote-2&quot; for=&quot;sidenote__checkbox--2&quot; class=&quot;sidenote__button sidenote__button--number-2 &quot;&gt;consistent results&lt;/label&gt;
+&lt;small id=&quot;sidenote-1&quot; class=&quot;sidenote__content sidenote__content--number-2&quot;&gt;
+&lt;span class=&quot;sidenote__content-parenthesis &quot;&gt; (sidenote: &lt;/span&gt;
+There will still be some variance in your time measurement. If more accuracy is required, I suggest running the script a number of times (using a job array) and averaging the result.
+&lt;span class=&quot;sidenote__content-parenthesis&quot;&gt;)&lt;/span&gt;
+&lt;/small&gt;
+&lt;/span&gt; you will have to specify the node hardware and request all the CPUs on a node. Information about the different nodes within the Oxford HTC partition can be found &lt;a href=&quot;https://www.arc.ox.ac.uk/arcus-htc-reference-guide&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Let’s assume that we want to run our job on a SandyBridge E5-2650 (2GHz) node. We can request exclusive access to a whole node by using SLURM constraints. Just add the following lines to the &lt;code class=&quot;highlighter-rouge&quot;&gt;run_job.sh&lt;/code&gt; submission script:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span class=&quot;c&quot;&gt;#SBATCH --constraint='cpu_sku:E5-2650'&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;#SBATCH --exclusive&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;</content><author><name></name></author><category term="julia" /><category term="HPC" /><summary type="html">One of the bigger productivity improvements for me in terms of tweaking and benchmarking algorithms was the ability to run Julia code on my university’s HPC nodes. This allowed me to test different versions of my code in parallel while still being able to do other work on my local machine. This is a quick tutorial on how to setup Julia (sidenote: This tutorial is intended for a Julia project, but most of the content applies if you want to run jobs in C++/R/Python/etc. ) on a computing cluster and use SLURM to manage compute jobs.</summary></entry></feed>

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--     <link href="https://fonts.googleapis.com/css?family=Roboto+Slab" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-134159986-1"></script>
+</head>
+<html>
+  <head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="One of the bigger productivity improvements for me in terms of tweaking and benchmarking algorithms was the ability to run Julia code on my university’s HPC ...">
+    <meta name="author" content="Michael Garstka">
+
+    <title>Running Julia jobs on an HPC cluster</title>
+    <link rel="shortcut icon" type="image/x-icon" href="/assets/images/favicon.ico">
+    <link rel="canonical" href="https://migarstka.github.io/juliahpc/">
+
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css">
+
+    <!-- Custom style -->
+    <link href="/assets/css/academicons.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
+    <!-- MathJX -->
+    <script type="text/javascript"
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+
+
+</head>
+
+  <body id="page-top">
+      <main class="default-page-main">
+              <!-- Navbar ================================================== -->
+  <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container-fluid">
+      <!-- Brand and toggle get grouped for better mobile display -->
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+	<a class="navbar-brand" href="https://migarstka.github.io">Michael Garstka</a>
+        <!-- Show this only when navbar collapses (xs) -->
+        <a class="nav pull-right visible-xs" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_small.png" height="50" alt="University of Oxford" /></a>
+      </div>
+
+      <!-- Collect the nav links, forms, and other content for toggling -->
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        <ul class="nav navbar-nav">
+          
+          
+          
+  
+
+  
+
+  
+
+
+
+
+    </ul>
+    <!-- Show this when screen is small but navbar has not collapsed yet -->
+    <a class="nav pull-right visible-sm" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_small.png" height="50" alt="University of Oxford" /></a>
+    <!-- Show this when screen is big -->
+    <a class="nav pull-right hidden-xs hidden-sm" href="http://www.ox.ac.uk" title="University of Oxford"><img src="/assets/images/oxford_rectangle.png" height="50" alt="University of Oxford" /></a>
+    </div><!-- /.navbar-collapse -->
+  </div><!-- /.container-fluid -->
+</nav>
+
+              <div class="page-layout">
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 col-md-offset-1">
+      
+      <div class = "page-header">
+          <h1>
+              Running Julia jobs on an HPC cluster
+          </h1>
+      </div>
+      <!-- <h2 class="ruled" style="margin-bottom:20px">Running Julia jobs on an HPC cluster</h2> -->
+      
+      <div class="post-info">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pen" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M13.498.795l.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001zm-.644.766a.5.5 0 0 0-.707 0L1.95 11.756l-.764 3.057 3.057-.764L14.44 3.854a.5.5 0 0 0 0-.708l-1.585-1.585z"/>
+          </svg>
+        <i>Thursday, 17. December 2020 ⋅ <span class="reading-time" title="Estimated read time">
+  
+  
+    8 minute
+  
+</span>
+
+ read ⋅ tags: <span class="tagsstyle">HPC, julia</span></i>
+
+<!--
+
+  <div>
+            </div> -->
+      </div>
+      <div class = "page-content">
+
+      <p>One of the bigger productivity improvements for me in terms of tweaking and benchmarking algorithms was the ability to run Julia code on my university’s HPC nodes. This allowed me to test different versions of my code in parallel while still being able to do other work on my local machine. This is a quick tutorial on how to 
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--4" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-4" for="sidenote__checkbox--4" class="sidenote__button sidenote__button--number-4 ">setup Julia </label>
+<small id="sidenote-4" class="sidenote__content sidenote__content--number-4">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+This tutorial is intended for a Julia project, but most of the content applies if you want to run jobs in C++/R/Python/etc.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span> 
+on a computing cluster and use SLURM to manage compute jobs.</p>
+
+<p>I am writing this based on my experience with the <a href="https://www.arc.ox.ac.uk/arc-systems">University of Oxford HPC  cluster</a> (Arcus-HTC) which runs CentOS Linux 7 and uses <a href="slurm.schedmd.com/">SLURM</a> for job scheduling. This means that based on your university / company setup your experience may differ. In particular the ARC login nodes are connected to the internet which makes installing Julia packages a lot easier.</p>
+
+<h2 id="login-and-installing-julia">Login and installing Julia</h2>
+<p>Once you have an account for Oxford ARC, connect to the University VPN and login via ssh:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh -X USERNAME@oscgate.arc.ox.ac.uk</code></pre></figure>
+
+<p>You’ll likely connect to one of the cluster’s login nodes. Oxford ARC has different partitions you can choose for your jobs:</p>
+
+<ul>
+  <li>Arcus-B for multi-node parallel computation</li>
+  <li>Arcus-HTC for high-throughput lower core count jobs.</li>
+</ul>
+
+<p>I want to use the HTC nodes, so I will again connect to them via ssh:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh -X arcus-htc</code></pre></figure>
+
+<p>On the login node, two important folders were created for each user:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">$HOME/</code> - points to the home directory associated with your user account</li>
+  <li><code class="highlighter-rouge">$DATA/</code> - a folder to store larger files</li>
+</ul>
+
+<p>To 
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--3" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-3" for="sidenote__checkbox--3" class="sidenote__button sidenote__button--number-3 ">install Julia </label>
+<small id="sidenote-3" class="sidenote__content sidenote__content--number-3">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+Some version of Julia/Python/R/Matlab might already be available on ARC. Check with <code class="highlighter-rouge">module avail</code>.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span> 
+we simply download the <a href="https://julialang.org/downloads/">Julia binaries</a> to our <code class="highlighter-rouge">$DATA/</code> folder and unzip them:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">cd</span> <span class="nv">$DATA</span>
+wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
+unzip julia-1.5.3-linux-x86_64.tar.gz</code></pre></figure>
+
+<p>To run Julia on the login node we can type:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">./julia-1.5.3-linux-x86_64/bin/julia</code></pre></figure>
+
+<p>(You should generally not run any significant computations on the login nodes, but it is a good way to check that everything works. Also it is a good idea to create a symlink or alias to <code class="highlighter-rouge">/julia-1.5.3-linux-x86_64/bin/julia</code>. )</p>
+
+<h2 id="installing-julia-packages">Installing Julia packages</h2>
+<p>You’ll find your Julia home folder at <code class="highlighter-rouge">$HOME/.julia/</code>. Since the ARC nodes are connected to the internet you can simply download any packages using the normal workflow. I am assuming here that we want to setup some scripts in the project folder <code class="highlighter-rouge">$DATA/myproject/</code>:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>1. Run Julia
+2. Create a new project environment `activate .`
+3. Install packages: Type `]` and `pkg&gt; add Statistics`
+</code></pre>
+</div>
+
+<h2 id="uploading-your-code">Uploading your code</h2>
+<p>This is a matter of taste but I prefer to be able to modify any of my code both locally and remotely. I therefore initialise <code class="highlighter-rouge">/myproject</code> as a
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--1" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-1" for="sidenote__checkbox--1" class="sidenote__button sidenote__button--number-1 ">Git repository</label>.
+<small id="sidenote-1" class="sidenote__content sidenote__content--number-1">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+A quick overview to get started with Git can be found <a href="https://rogerdudler.github.io/git-guide/">here</a>. 
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span>
+I can then edit a local copy and <code class="highlighter-rouge">git push</code> any of the local changes or vice versa. The project dependencies for this project are tracked by Julia in the  <code class="highlighter-rouge">Project.toml</code> and <code class="highlighter-rouge">Manifest.toml</code> files. Changes in both files are also tracked via Git to make sure the same dependencies are used locally and remotely.</p>
+
+<p>This setup allows me to test or debug any changes to my code locally and be certain that it will run the same way on the remote node. Debugging the code on the remote node is more time consuming because your compute jobs do not necessarily execute immediately. For example it might take several minutes until you receive the error message that you misspelled a function name.</p>
+
+<p>Sometimes I want to upload files from my machine without tracking them via git, e.g. large dataset files like <code class="highlighter-rouge">dataset.csv</code>. To transfer files I use <code class="highlighter-rouge">scp</code> 
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--5" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-5" for="sidenote__checkbox--5" class="sidenote__button sidenote__button--number-5 ">(secure copy protocol)</label>.
+<small id="sidenote-5" class="sidenote__content sidenote__content--number-5">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+Syntax: scp [OPTION] [user@SRC_HOST:]file1 [user@DEST_HOST:]file2
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span>
+To upload <code class="highlighter-rouge">dataset.csv</code> I simply type:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">scp dataset.csv USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/.</code></pre></figure>
+
+<p>To transfer a result file <code class="highlighter-rouge">results.csv</code> back to the current folder on my local machine I can use the same command:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">scp USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/results.csv .</code></pre></figure>
+
+<h2 id="scheduling-jobs">Scheduling jobs</h2>
+<p>Oxford ARC uses the <a href="slurm.schedmd.com/">SLURM</a> workload manager to request and manage compute jobs. Assuming we are still in the folder <code class="highlighter-rouge">$DATA/myproject</code> the basic workflow to create a new job is:</p>
+
+<ul>
+  <li>write a Julia script <code class="highlighter-rouge">myscript.jl</code> to run your code</li>
+  <li>manage all Julia project dependencies using the environment files <code class="highlighter-rouge">Project.toml</code> and <code class="highlighter-rouge">Manifest.toml</code></li>
+  <li>write a job submission script <code class="highlighter-rouge">run_job.sh</code> that requests compute resources and tells the compute nodes what to do</li>
+</ul>
+
+<p>Let’s assume we want to run the following script <code class="highlighter-rouge">myscript.jl</code> to (inefficiently) compute and print the 20-th Fibonacci number:</p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="k">function</span><span class="nf"> fibonacci</span><span class="x">(</span><span class="n">n</span><span class="o">::</span><span class="kt">Int64</span><span class="x">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">n</span>
+    <span class="k">else</span>
+        <span class="k">return</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="x">)</span> <span class="o">+</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="x">)</span>
+    <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="n">println</span><span class="x">(</span><span class="s">"The 20-th fibonacci number is </span><span class="si">$</span><span class="s">(fibonacci(20))."</span><span class="x">)</span></code></pre></figure>
+
+<p>To run this script on one of the compute nodes we define a submission script <code class="highlighter-rouge">run_job.sh</code>:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#!/bin/bash</span>
+
+<span class="c">#SBATCH --time=0:05:00</span>
+<span class="c">#SBATCH --job-name="Fibonacci_calculation"</span>
+<span class="c">#SBATCH --nodes=1</span>
+<span class="c">#SBATCH --ntasks-per-node=1</span>
+<span class="c">#SBATCH --partition=htc</span>
+<span class="c">#SBATCH --output="Fibonacci.out"</span>
+<span class="c">#SBATCH --error="Fibonacci.err.out"</span>
+<span class="c">#SBATCH --mail-type=ALL</span>
+<span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
+
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+include("myscript.jl")'</span></code></pre></figure>
+
+<p>Lines starting with <code class="highlighter-rouge">#SBATCH</code> are SLURM commands. We request 5min of computation time on one CPU. We further want to run it on the ARC-HTC partition and get status updates about our job sent to our email.</p>
+
+<p>The last line in the script calls Julia, instantiates the 
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--7" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-7" for="sidenote__checkbox--7" class="sidenote__button sidenote__button--number-7 ">project environment</label>,
+<small id="sidenote-7" class="sidenote__content sidenote__content--number-7">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+Suggested reading: <a href="https://julialang.github.io/Pkg.jl/v1/environments/">Working with environments</a>.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span>i.e. installs any package dependencies defined in <code class="highlighter-rouge">Project.toml</code>, and runs our script.</p>
+
+<p>We then submit the job using the shell with</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">sbatch run_job.sh</code></pre></figure>
+
+<p>Depending on the available resources the job is then queued and waiting for execution. You can look up the current job status with</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">squeue -u USERNAME</code></pre></figure>
+
+<p>To cancel the job use either of the two:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">scancel -j <span class="o">[</span>JOBNUMBER]
+scancel -u <span class="o">[</span>USERNAME]</code></pre></figure>
+
+<h3 id="job-arrays">Job arrays</h3>
+<p>Sometimes we want to run the same job multiple times with only minor modifications, e.g. running our algorithm with one of the hyperparameters changed. For this case SLURM <a href="https://slurm.schedmd.com/job_array.html">job arrays</a> are quite useful. They execute the submission script multiple times and allow you to run different versions of the same script.
+The ability to run time-consuming jobs in parallel can be a big time saver.
+Let’s assume that we want to calculate the Fibonacci number for <code class="highlighter-rouge">n = 20, 30, 40</code> in separate jobs.</p>
+
+<p>To achieve this we add one line with an array command to our submission script <code class="highlighter-rouge">run_job.sh</code>:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#!/bin/bash</span>
+
+<span class="c">#SBATCH --time=0:05:00</span>
+<span class="c">#SBATCH --job-name="Fibonacci_calculation"</span>
+<span class="c">#SBATCH --nodes=1</span>
+<span class="c">#SBATCH --ntasks-per-node=1</span>
+<span class="c">#SBATCH --partition=htc</span>
+<span class="c">#SBATCH --output="Fibonacci_%a.out"</span>
+<span class="c">#SBATCH --error="Fibonacci_%a.err.out"</span>
+<span class="c">#SBATCH --mail-type=ALL</span>
+<span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
+<span class="c">#SBATCH --array=1-3</span>
+
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+include("myscript.jl")'</span></code></pre></figure>
+
+<p>The job will now run three times. The array id is given by the environment variable<code class="highlighter-rouge">SLURM_ARRAY_TASK_ID</code> which we can use inside our Julia script to select <code class="highlighter-rouge">n</code>:</p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="c"># get the environment variable</span>
+<span class="n">task_id</span> <span class="o">=</span> <span class="n">Base</span><span class="o">.</span><span class="n">parse</span><span class="x">(</span><span class="kt">Int</span><span class="x">,</span> <span class="n">ENV</span><span class="x">[</span><span class="s">"SLURM_ARRAY_TASK_ID"</span><span class="x">])</span>
+<span class="n">n_arr</span> <span class="o">=</span> <span class="x">[</span><span class="mi">20</span><span class="x">;</span> <span class="mi">30</span><span class="x">;</span> <span class="mi">40</span><span class="x">]</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">n_arr</span><span class="x">[</span><span class="n">task_id</span><span class="x">]</span>
+
+<span class="k">function</span><span class="nf"> fibonacci</span><span class="x">(</span><span class="n">n</span><span class="o">::</span><span class="kt">Int64</span><span class="x">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">n</span>
+    <span class="k">else</span>
+        <span class="k">return</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="x">)</span> <span class="o">+</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="x">)</span>
+    <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="n">println</span><span class="x">(</span><span class="s">"The </span><span class="si">$(n)-</span><span class="s">th fibonacci number is </span><span class="si">$</span><span class="s">(fibonacci(n))."</span><span class="x">)</span></code></pre></figure>
+
+<h3 id="multithreading">Multithreading</h3>
+<p>To use multithreading in our Julia script we have to request multiple cores on a computing node. The following script <code class="highlighter-rouge">my_multithreaded_script.jl</code> is used to compute the Fibonacci number for different <code class="highlighter-rouge">n</code> on
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--6" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-6" for="sidenote__checkbox--6" class="sidenote__button sidenote__button--number-6 ">parallel threads
+</label>:
+<small id="sidenote-6" class="sidenote__content sidenote__content--number-6">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+This is not the best example for multithreading, because computing the Fibonacci number for the highest <code class="highlighter-rouge">n</code> computes the Fibonacci number for all lower <code class="highlighter-rouge">n</code> in the process.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span></p>
+
+<figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="c"># check number of threads</span>
+<span class="n">println</span><span class="x">(</span><span class="s">"Number of threads: </span><span class="si">$</span><span class="s">(Threads.nthreads())"</span><span class="x">)</span>
+
+<span class="n">n_arr</span> <span class="o">=</span> <span class="x">[</span><span class="mi">5</span><span class="x">;</span> <span class="mi">10</span><span class="x">;</span> <span class="mi">15</span><span class="x">;</span> <span class="mi">20</span><span class="x">;</span> <span class="mi">25</span><span class="x">;</span> <span class="mi">30</span><span class="x">;</span> <span class="mi">35</span><span class="x">;</span> <span class="mi">40</span><span class="x">]</span>
+
+<span class="k">function</span><span class="nf"> fibonacci</span><span class="x">(</span><span class="n">n</span><span class="o">::</span><span class="kt">Int64</span><span class="x">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">n</span>
+    <span class="k">else</span>
+        <span class="k">return</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="x">)</span> <span class="o">+</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="x">)</span>
+    <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="c"># use multiple threads to compute the fibonacci number for each n in n_arr</span>
+<span class="n">fib</span> <span class="o">=</span> <span class="n">zeros</span><span class="x">(</span><span class="n">length</span><span class="x">(</span><span class="n">n_arr</span><span class="x">))</span>
+<span class="n">Threads</span><span class="o">.</span><span class="nd">@threads</span> <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span><span class="x">:</span><span class="n">length</span><span class="x">(</span><span class="n">n_arr</span><span class="x">)</span>
+    <span class="n">fib</span><span class="x">[</span><span class="n">k</span><span class="x">]</span> <span class="o">=</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n_arr</span><span class="x">[</span><span class="n">k</span><span class="x">])</span>
+<span class="k">end</span></code></pre></figure>
+
+<p>To run this script we use the following modified SLURM submission script:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#!/bin/bash</span>
+
+<span class="c">#SBATCH --time=0:05:00</span>
+<span class="c">#SBATCH --job-name="Fibonacci_multithreaded_calculation"</span>
+<span class="c">#SBATCH --nodes=1</span>
+<span class="c">#SBATCH --ntasks-per-node=8</span>
+<span class="c">#SBATCH --partition=htc</span>
+<span class="c">#SBATCH --output="Fibonacci.out"</span>
+<span class="c">#SBATCH --error="Fibonacci.err.out"</span>
+<span class="c">#SBATCH --mail-type=ALL</span>
+<span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
+
+<span class="nb">export </span><span class="nv">JULIA_NUM_THREADS</span><span class="o">=</span>8
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+include("my_multithreaded_script.jl")'</span></code></pre></figure>
+
+<p>The only changes are that we now request 8 cores on one node and export the environment variable <code class="highlighter-rouge">JULIA_NUM_THREADS</code> to start Julia with 8 threads.</p>
+
+<h3 id="ensuring-consistent-results">Ensuring consistent results</h3>
+<p>Let’s assume that you want to benchmark your algorithm, e.g. measure its execution time. In order to generate consistent results from multiple runs, you have to make sure that the Julia script is executed on the same hardware every time. If no hardware is specified SLURM will just run the job on the next available node. If the node has eight CPUs and your job runs on four of them, then the performance of your job will depend on what other jobs run on the remaining four CPUs.</p>
+
+<p>To ensure
+<span class="sidenote">
+<input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--2" class="sidenote__checkbox" />
+<label tabindex="0" title="" aria-describedby="sidenote-2" for="sidenote__checkbox--2" class="sidenote__button sidenote__button--number-2 ">consistent results</label>
+<small id="sidenote-1" class="sidenote__content sidenote__content--number-2">
+<span class="sidenote__content-parenthesis "> (sidenote: </span>
+There will still be some variance in your time measurement. If more accuracy is required, I suggest running the script a number of times (using a job array) and averaging the result.
+<span class="sidenote__content-parenthesis">)</span>
+</small>
+</span> you will have to specify the node hardware and request all the CPUs on a node. Information about the different nodes within the Oxford HTC partition can be found <a href="https://www.arc.ox.ac.uk/arcus-htc-reference-guide">here</a>.</p>
+
+<p>Let’s assume that we want to run our job on a SandyBridge E5-2650 (2GHz) node. We can request exclusive access to a whole node by using SLURM constraints. Just add the following lines to the <code class="highlighter-rouge">run_job.sh</code> submission script:</p>
+
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#SBATCH --constraint='cpu_sku:E5-2650'</span>
+<span class="c">#SBATCH --exclusive</span></code></pre></figure>
+
+
+
+        <div class="post-email">
+          <i>Comments / questions / mistakes? Please get in touch with me via <a href="mailto: michael.garstka@eng.ox.ac.uk">email</a> (<a href="https://keys.openpgp.org/search?q=michael.garstka@eng.ox.ac.uk">public key</a>).</i>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+      </main>
+    
+    <!-- Footer ================================================== -->
+    <footer>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    <!-- <div class="col-md-3 col-md-offset-3 text-center"> -->
+                        <a href="mailto:michael.garstka@eng.ox.ac.uk"><i class="fa fa-envelope-square fa-3x"></i></a>
+                        <a href="http://www.linkedin.com/in/michaelgarstka/"><i class="fa fa-linkedin-square fa-3x" aria-hidden="true"></i></a>
+                         <a href="https://www.github.com/migarstka"><i class="fa fa-github-square fa-3x"></i></a>
+                         <a href="/feed.xml"><i class="fa fa-rss-square fa-3x"></i></a>
+
+                          <p class="copyright">&copy; <script>document.write(new Date().getFullYear())</script> <a href="https://migarstka.github.io">Michael Garstka</a></p>
+                    <!-- </div> -->
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mathjax -->
+    <script type="text/javascript"
+    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+
+    <!-- Google Analytics -->
+    <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '', 'auto');
+    ga('send', 'pageview');
+    </script>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+    
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-134159986-1');
+</script>
+
+    
+  </body>
+</html>
