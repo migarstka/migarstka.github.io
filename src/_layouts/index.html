@@ -1,0 +1,40 @@
+---
+layout: default
+permalink: /
+---
+<!-- Main Container ================================================== -->
+
+<div class="container-fluid">
+  <div class="row">
+
+    <!-- Left Sidebar -->
+    <div class="col-md-8 col-md-offset-2 homepage-details">
+
+          <img src="{{site.baseurl}}/assets/images/photo.jpg" alt="Photo" class="img-thumbnail" style="float:left; height:250px; margin-right:50px; margin-top:5px; margin-bottom:10px">
+
+        <h2 style="margin-top: 0px">{{site.name}}</h2>
+        <address>
+          {{site.department}}<br>
+          {{site.university}}<br>
+          {{site.address}}<br>
+          <br>
+          <i class="fa fa-envelope-square fa-fw" aria-hidden="true"></i> <a href="mailto:{{site.email}}">{{site.email}}</a><br>
+          <i class="fa fa-key fa-fw" aria-hidden="true"></i> <a href="https://keys.openpgp.org/search?q=michael.garstka@eng.ox.ac.uk">GPG Public Key</a><br>
+          <i class="fa fa-linkedin-square fa-fw" aria-hidden="true"></i> <a href="http://www.linkedin.com/in/{{site.linkedin}}/">linkedin.com/in/{{site.linkedin}}</a><br>
+          <i class="fa fa-github-square fa-fw" aria-hidden="true"></i> <a href="https://github.com/{{site.github}}">github.com/{{site.github}}</a>
+        </address>
+      <!-- </div> -->
+    </div>
+    </div> <!-- Close Row-->
+
+<div class="row">
+<!-- Right Sidebar -->
+<div class="col-md-8 col-md-offset-2">
+
+{{ content }}
+
+</div>
+
+
+</div> <!-- Close Row-->
+</div> <!-- Close container-->

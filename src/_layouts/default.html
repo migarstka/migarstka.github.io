@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--     <link href="https://fonts.googleapis.com/css?family=Roboto+Slab" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"> -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-134159986-1"></script>
+</head>
+<html>
+  {% include head.html %}
+  <body id="page-top">
+      <main class="default-page-main">
+              {% include navbar.html %}
+              {{ content }}
+      </main>
+    {% include footer.html %}
+    {% include footer_scripts.html %}
+    {% if jekyll.environment == 'production' %}
+    {% include analytics.html %}
+    {% endif %}
+  </body>
+</html>

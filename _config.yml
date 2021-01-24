@@ -1,0 +1,85 @@
+# Generation settings
+source: src
+destination: _site
+
+# Site settings
+title: Michael Garstka - University of Oxford
+description: Doctoral Student in the Control Group, Department of Engineering, University of Oxford
+# # this means to ignore newlines until "baseurl:"
+# Write an awesome description for your new site here. You can edit this
+# line in _config.yml. It will appear in your document head meta (for
+# Google search results) and in your feed.xml site description.
+#
+url: "https://migarstka.github.io" # the base hostname & protocol for your site
+baseurl: ""
+
+# User data
+email: michael.garstka@eng.ox.ac.uk
+department: Department of Engineering
+university: University of Oxford
+address: ETB Room 3023, Parks Road, Oxford OX1 3PJ, UK
+
+name: "Michael Garstka"
+github:  migarstka
+linkedin: michaelgarstka
+google_scholar:
+google_analytics:
+
+
+# Build settings
+# Conversion
+markdown:    kramdown
+highlighter: rouge
+
+# Markdown Processors
+kramdown:
+  input: GFM
+  auto_ids: true
+  syntax_highlighter: rouge
+
+# Ignore certain directories
+include:
+    - .nojekyll
+    - _pages
+
+
+# Setup SASS dir
+sass:
+    sass_dir: _sass
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+
+gems:
+  - jekyll-feed
+  - jekyll/scholar
+#Plugin Scholar
+
+scholar:
+  style: src/_bibliography/ieee_only_author.csl  # Extract only author's name using IEEE format
+  # style: ieee
+  locale: en
+
+  # sort_by: none
+  order: descending
+  sort_by: month
+  group_by: type, year
+  group_order: ascending, descending
+  type_names: { inproceedings: 'Conference Proceedings' }
+  type_order: [article, inproceedings, thesis]
+  # order: ascending
+  bibliography_list_tag: ul
+  # bibliography_item_tag: li
+  bibliography_group_tag: h4
+
+  source: _bibliography
+  bibliography: bibliography.bib
+  # bibliography_template: "{{reference}}"
+  bibliography_template: bib
+  parse_names: true
+
+  replace_strings: true
+  join_strings:    true
+
+  query: "@*"

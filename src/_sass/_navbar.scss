@@ -1,0 +1,58 @@
+.navbar{
+    ul > li{
+        font-size: 100%;
+    }
+}
+
+
+.navbar-inverse {
+    background-color: $blue-color;
+    background-image: none;
+    border: 0;
+    .navbar-brand { // Brand Name
+      color: $white-color;
+      &:hover {
+        color: $white-color;
+      }
+    }
+
+    // Navbar inactive link color
+    .navbar-nav > li > a{
+        color: $grey-color;
+    }
+
+    .navbar-nav > li > a:hover,
+    .navbar-nav > li > a:focus,{
+        color: $white-color;
+    }
+
+    // Active class color
+    .navbar-nav > .active > a,
+     .navbar-nav > .active > a:hover,
+     .navbar-nav > .active > a:focus {
+          background: $blue-color;
+     }
+
+
+    // Collapsed toggle
+    .navbar-toggle {
+      &:hover, &:focus {
+        background-color: $blue-color;
+      }
+    }
+}
+
+.dropdown-menu>li>a{
+    color: $light-blue-color;
+        &:hover, &:focus {
+            background-color: $light-blue-color;
+            color: $white-color;
+            background-image: none;
+        }
+}
+
+.navbar-collapse {
+    // min-height: 400px;
+    max-height: 100% !important;
+    overflow-y: scroll !important;
+}

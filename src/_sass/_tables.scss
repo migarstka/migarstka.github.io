@@ -1,0 +1,33 @@
+.table tbody tr:hover {
+  td, th {
+    background-color: $very-light-blue-color;
+  }
+}
+
+.table>thead>tr>th {
+    border-bottom: 0px;
+}
+
+.table-hover thead > tr{
+  background-color: $blue-color;
+  color: $white-color;
+}
+
+// .table {
+//   margin-bottom: 20pt;
+//   // margin-top: 20pt;
+// }
+
+
+
+
+// Fix responsive tables behavior with abstract
+@media(max-width:768px){
+    blockquote{
+        p{
+            max-width: 250px;
+            white-space: normal !important;
+            word-break:break-all;
+        }
+    }
+}

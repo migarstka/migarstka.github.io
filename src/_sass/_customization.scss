@@ -1,0 +1,108 @@
+// Body customization for flexible sticky footer
+body {
+    padding-top: 50px;  // Skip for navbar fixed top
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    font-size: 16px;
+}
+main {
+    flex: 1;
+}
+
+.homepage-details{
+    padding-top: 40px;
+}
+
+// Default page customization
+.default-page-main{
+    padding-bottom: 30px;
+}
+
+/* Link Styling */
+a,a:visited {
+	color: $light-blue-color;
+	text-decoration: none;
+}
+a:hover {
+	color: $blue-color;
+	text-decoration: none;
+}
+
+
+
+// Column for the Portrait Picture
+.col-fixed-200{
+    width:200px;
+    // background:red;
+    position:fixed;
+    // height:100%;
+}
+.col-offset-200{
+  padding-left:215px;
+}
+
+
+// .anchor-dest {
+//   padding-top: 40px;
+//   margin-top: 0px;
+//   /* display: inline-block; [> required for webkit browsers <] */
+// }
+
+p{
+    text-align:justify;
+}
+
+blockquote {
+  font-size: 12px;
+  text-align: justify;
+  p{
+      margin-bottom: 0px;
+      padding: 5px 0;
+  }
+}
+
+.smalltext {
+  font-size: 12px;
+}
+// mostly Michael's edits
+h3 {
+  padding-top: 20px;
+  font-size: 24px;
+  font-weight: 300;
+}
+
+td {
+  padding-right: 30px;
+}
+
+.page-layout {
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+.post-info {
+  padding-bottom: 30px
+}
+
+.post-email {
+  padding-top: 10px;
+}
+.page-content a{
+  color: black;
+  text-decoration: none;
+  border-bottom: $light-blue-color 0.15em solid;
+
+}
+
+.page-content a:hover{
+  color: $light-blue-color;
+  text-decoration: none;
+  border-bottom: $light-blue-color 0.15em solid;
+  padding-bottom: 0.125em;
+
+}
+
+.tagsstyle {
+  color: black;
+
+}

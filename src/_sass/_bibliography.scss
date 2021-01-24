@@ -1,0 +1,47 @@
+/* BibTeX items */
+
+.bibliography li {
+  // margin-top: 20px;
+  margin-bottom: 5px;
+  list-style-type: none;
+}
+
+// Custom Bullet Point
+.bibliography li:before {
+margin:0 3px 0 -20px;
+// color: #f00;
+}
+
+.bibitem-buttons {
+  // margin-top: 10px;
+  // margin-bottom: 10px;
+  a {
+    display: inline-block;
+    margin-right: 20px;
+    font-size: 16px;
+  }
+}
+
+.doi {
+  display: inline-block;
+}
+
+// .btn-toggle.collapsed .fa-caret-down:before {
+//   content: "\f0da";
+// }
+
+.bibtex-code {
+  font-size: 14px;
+}
+
+.btn-toggle {
+  &.collapsed .icon-right {
+    display: inline-block;
+  }
+  .icon-right, &.collapsed .icon-down {
+    display: none;
+  }
+  .icon-down {
+    display: inline-block;
+  }
+}

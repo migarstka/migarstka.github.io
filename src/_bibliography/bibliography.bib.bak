@@ -1,0 +1,46 @@
+% Encoding: UTF-8
+
+@InProceedings{Garstka_2019a,
+  author        = {Michael Garstka and Mark Cannon and Paul Goulart},
+  booktitle     = {18th European Control Conference (ECC)},
+  title         = {{COSMO}: A conic operator splitting method for large convex problems},
+  year          = {2019},
+  pages         = {1951-1956},
+  doi           = {10.23919/ECC.2019.8796161},
+  url           = {https://ieeexplore.ieee.org/document/8796161},
+}
+
+
+@InProceedings{garstka_2020,
+  author        = {Garstka, Michael and Cannon, Mark and Goulart, Paul},
+  booktitle     = {21st IFAC World Congress},
+  title         = {A clique graph based merging strategy for decomposable {SDPs}},
+  year          = {2020},
+  address       = {Berlin, Germany},
+  archiveprefix = {arXiv},
+  eprint        = {1911.05615},
+  keywords      = {Mathematics - Optimization and Control},
+  primaryclass  = {math.OC},
+  url           = {https://arxiv.org/abs/1911.05615}
+}
+
+@Article{Garstka_2020,
+  author = {Michael Garstka and Mark Cannon and Paul Goulart},
+  title  = {{COSMO}: A conic operator splitting method for convex conic problems},
+  year   = {2020},
+  eprint        = {1901.10887},
+  keywords      = {Mathematics - Optimization and Control},
+  primaryclass  = {math.OC},
+  archiveprefix = {arXiv},
+  url           = {https://arxiv.org/abs/1901.10887}
+}
+
+@InProceedings{Cronin_2020,
+  author    = {J. Cronin and T. Kirk and A. Orr and H. Steel and C. Fuenteslopez and D. Crockett and K. Ahlgren and J. Beddoe Rosendo and C. Bergeles and S. East and C. Edwardes and J. Fisk and M. Garstka and C. Heaysman and A. Hussain and I. Kempf and D. Salisbury and C. Seneci and R. Staruch and V. Vitiello and M. Xochicale and A. Castrejon-Pita and T. Denison and P. Goulart and P. Jha and S. Ourselin and M. Thompson and R. Beale and L. Camporota and A. Farmery and F. Formenti},
+  booktitle = {European Society of Intensive Care Medicine Lives 2020},
+  title     = {In vivo performance of the {O}x{V}ent rapidly manufactured ventilator},
+  year      = {2020},
+  address   = {Madrid, Spain},
+}
+
+@Comment{jabref-meta: databaseType:bibtex;}
