@@ -435,8 +435,9 @@ c5b68639402ff014264faf82e7b61beaf446a1ae Initial commit
 </code></pre>
 </div>
 
-<p>I can use <code class="highlighter-rouge">git bisect</code> to find the commit that is causing the performance issues by writing a script that benchmarks the sorting algorithm and compares it to a target time plus some tolerance. If the test passes the commit is classified as good and as bad otherwise. We can use the following script:
-<strong>time_code.jl</strong></p>
+<p>I can use <code class="highlighter-rouge">git bisect</code> to find the commit that is causing the performance issues by writing a script that benchmarks the sorting algorithm and compares it to a target time plus some tolerance. If the test passes the commit is classified as good and as bad otherwise. We can use the following script:</p>
+
+<p><strong>time_code.jl</strong></p>
 
 <figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="n">using</span> <span class="n">BenchmarkTools</span><span class="x">,</span> <span class="n">Test</span><span class="x">,</span> <span class="n">Random</span>
 <span class="n">include</span><span class="x">(</span><span class="s">"./merge_sort.jl"</span><span class="x">)</span>
