@@ -126,7 +126,7 @@ on a computing cluster and use SLURM to manage compute jobs.</p>
 <h2 id="login-and-installing-julia">Login and installing Julia</h2>
 <p>Once you have an account for Oxford ARC, connect to the University VPN and login via ssh:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh -X USERNAME@oscgate.arc.ox.ac.uk</code></pre></figure>
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh <span class="nt">-X</span> USERNAME@oscgate.arc.ox.ac.uk</code></pre></figure>
 
 <p>You’ll likely connect to one of the cluster’s login nodes. Oxford ARC has different partitions you can choose for your jobs:</p>
 
@@ -137,13 +137,13 @@ on a computing cluster and use SLURM to manage compute jobs.</p>
 
 <p>I want to use the HTC nodes, so I will again connect to them via ssh:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh -X arcus-htc</code></pre></figure>
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">ssh <span class="nt">-X</span> arcus-htc</code></pre></figure>
 
 <p>On the login node, two important folders were created for each user:</p>
 
 <ul>
-  <li><code class="highlighter-rouge">$HOME/</code> - points to the home directory associated with your user account</li>
-  <li><code class="highlighter-rouge">$DATA/</code> - a folder to store larger files</li>
+  <li><code class="language-plaintext highlighter-rouge">$HOME/</code> - points to the home directory associated with your user account</li>
+  <li><code class="language-plaintext highlighter-rouge">$DATA/</code> - a folder to store larger files</li>
 </ul>
 
 <p>To 
@@ -152,33 +152,32 @@ on a computing cluster and use SLURM to manage compute jobs.</p>
 <label tabindex="0" title="" aria-describedby="sidenote-3" for="sidenote__checkbox--3" class="sidenote__button sidenote__button--number-3 ">install Julia </label>
 <small id="sidenote-3" class="sidenote__content sidenote__content--number-3">
 <span class="sidenote__content-parenthesis "> (sidenote: </span>
-Some version of Julia/Python/R/Matlab might already be available on ARC. Check with <code class="highlighter-rouge">module avail</code>.
+Some version of Julia/Python/R/Matlab might already be available on ARC. Check with <code class="language-plaintext highlighter-rouge">module avail</code>.
 <span class="sidenote__content-parenthesis">)</span>
 </small>
 </span> 
-we simply download the <a href="https://julialang.org/downloads/">Julia binaries</a> to our <code class="highlighter-rouge">$DATA/</code> folder and unzip them:</p>
+we simply download the <a href="https://julialang.org/downloads/">Julia binaries</a> to our <code class="language-plaintext highlighter-rouge">$DATA/</code> folder and unzip them:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="nb">cd</span> <span class="nv">$DATA</span>
 wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
-tar -xzf julia-1.5.3-linux-x86_64.tar.gz</code></pre></figure>
+<span class="nb">tar</span> <span class="nt">-xzf</span> julia-1.5.3-linux-x86_64.tar.gz</code></pre></figure>
 
 <p>To run Julia on the login node we can type:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash">./julia-1.5.3-linux-x86_64/bin/julia</code></pre></figure>
 
-<p>(You should generally not run any significant computations on the login nodes, but it is a good way to check that everything works. Also it is a good idea to create a symlink or alias to <code class="highlighter-rouge">/julia-1.5.3-linux-x86_64/bin/julia</code>. )</p>
+<p>(You should generally not run any significant computations on the login nodes, but it is a good way to check that everything works. Also it is a good idea to create a symlink or alias to <code class="language-plaintext highlighter-rouge">/julia-1.5.3-linux-x86_64/bin/julia</code>. )</p>
 
 <h2 id="installing-julia-packages">Installing Julia packages</h2>
-<p>You’ll find your Julia home folder at <code class="highlighter-rouge">$HOME/.julia/</code>. Since the ARC nodes are connected to the internet you can simply download any packages using the normal workflow. I am assuming here that we want to setup some scripts in the project folder <code class="highlighter-rouge">$DATA/myproject/</code>:</p>
+<p>You’ll find your Julia home folder at <code class="language-plaintext highlighter-rouge">$HOME/.julia/</code>. Since the ARC nodes are connected to the internet you can simply download any packages using the normal workflow. I am assuming here that we want to setup some scripts in the project folder <code class="language-plaintext highlighter-rouge">$DATA/myproject/</code>:</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>1. Run Julia
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. Run Julia
 2. Create a new project environment `activate .`
 3. Install packages: Type `]` and `pkg&gt; add Statistics`
-</code></pre>
-</div>
+</code></pre></div></div>
 
 <h2 id="uploading-your-code">Uploading your code</h2>
-<p>This is a matter of taste but I prefer to be able to modify any of my code both locally and remotely. I therefore initialise <code class="highlighter-rouge">/myproject</code> as a
+<p>This is a matter of taste but I prefer to be able to modify any of my code both locally and remotely. I therefore initialise <code class="language-plaintext highlighter-rouge">/myproject</code> as a
 <span class="sidenote">
 <input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--1" class="sidenote__checkbox" />
 <label tabindex="0" title="" aria-describedby="sidenote-1" for="sidenote__checkbox--1" class="sidenote__button sidenote__button--number-1 ">Git repository</label>.
@@ -188,11 +187,11 @@ A quick overview to get started with Git can be found <a href="https://rogerdudl
 <span class="sidenote__content-parenthesis">)</span>
 </small>
 </span>
-I can then edit a local copy and <code class="highlighter-rouge">git push</code> any of the local changes or vice versa. The project dependencies for this project are tracked by Julia in the  <code class="highlighter-rouge">Project.toml</code> and <code class="highlighter-rouge">Manifest.toml</code> files. Changes in both files are also tracked via Git to make sure the same dependencies are used locally and remotely.</p>
+I can then edit a local copy and <code class="language-plaintext highlighter-rouge">git push</code> any of the local changes or vice versa. The project dependencies for this project are tracked by Julia in the  <code class="language-plaintext highlighter-rouge">Project.toml</code> and <code class="language-plaintext highlighter-rouge">Manifest.toml</code> files. Changes in both files are also tracked via Git to make sure the same dependencies are used locally and remotely.</p>
 
 <p>This setup allows me to test or debug any changes to my code locally and be certain that it will run the same way on the remote node. Debugging the code on the remote node is more time consuming because your compute jobs do not necessarily execute immediately. For example it might take several minutes until you receive the error message that you misspelled a function name.</p>
 
-<p>Sometimes I want to upload files from my machine without tracking them via git, e.g. large dataset files like <code class="highlighter-rouge">dataset.csv</code>. To transfer files I use <code class="highlighter-rouge">scp</code> 
+<p>Sometimes I want to upload files from my machine without tracking them via git, e.g. large dataset files like <code class="language-plaintext highlighter-rouge">dataset.csv</code>. To transfer files I use <code class="language-plaintext highlighter-rouge">scp</code> 
 <span class="sidenote">
 <input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--5" class="sidenote__checkbox" />
 <label tabindex="0" title="" aria-describedby="sidenote-5" for="sidenote__checkbox--5" class="sidenote__button sidenote__button--number-5 ">(secure copy protocol)</label>.
@@ -202,24 +201,24 @@ Syntax: scp [OPTION] [user@SRC_HOST:]file1 [user@DEST_HOST:]file2
 <span class="sidenote__content-parenthesis">)</span>
 </small>
 </span>
-To upload <code class="highlighter-rouge">dataset.csv</code> I simply type:</p>
+To upload <code class="language-plaintext highlighter-rouge">dataset.csv</code> I simply type:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash">scp dataset.csv USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/.</code></pre></figure>
 
-<p>To transfer a result file <code class="highlighter-rouge">results.csv</code> back to the current folder on my local machine I can use the same command:</p>
+<p>To transfer a result file <code class="language-plaintext highlighter-rouge">results.csv</code> back to the current folder on my local machine I can use the same command:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash">scp USERNAME@oscgate.arc.ox.ac.uk:/home/USERNAME/results.csv .</code></pre></figure>
 
 <h2 id="scheduling-jobs">Scheduling jobs</h2>
-<p>Oxford ARC uses the <a href="slurm.schedmd.com/">SLURM</a> workload manager to request and manage compute jobs. Assuming we are still in the folder <code class="highlighter-rouge">$DATA/myproject</code> the basic workflow to create a new job is:</p>
+<p>Oxford ARC uses the <a href="slurm.schedmd.com/">SLURM</a> workload manager to request and manage compute jobs. Assuming we are still in the folder <code class="language-plaintext highlighter-rouge">$DATA/myproject</code> the basic workflow to create a new job is:</p>
 
 <ul>
-  <li>write a Julia script <code class="highlighter-rouge">myscript.jl</code> to run your code</li>
-  <li>manage all Julia project dependencies using the environment files <code class="highlighter-rouge">Project.toml</code> and <code class="highlighter-rouge">Manifest.toml</code></li>
-  <li>write a job submission script <code class="highlighter-rouge">run_job.sh</code> that requests compute resources and tells the compute nodes what to do</li>
+  <li>write a Julia script <code class="language-plaintext highlighter-rouge">myscript.jl</code> to run your code</li>
+  <li>manage all Julia project dependencies using the environment files <code class="language-plaintext highlighter-rouge">Project.toml</code> and <code class="language-plaintext highlighter-rouge">Manifest.toml</code></li>
+  <li>write a job submission script <code class="language-plaintext highlighter-rouge">run_job.sh</code> that requests compute resources and tells the compute nodes what to do</li>
 </ul>
 
-<p>Let’s assume we want to run the following script <code class="highlighter-rouge">myscript.jl</code> to (inefficiently) compute and print the 20-th Fibonacci number:</p>
+<p>Let’s assume we want to run the following script <code class="language-plaintext highlighter-rouge">myscript.jl</code> to (inefficiently) compute and print the 20-th Fibonacci number:</p>
 
 <figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="k">function</span><span class="nf"> fibonacci</span><span class="x">(</span><span class="n">n</span><span class="o">::</span><span class="kt">Int64</span><span class="x">)</span>
     <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span>
@@ -231,7 +230,7 @@ To upload <code class="highlighter-rouge">dataset.csv</code> I simply type:</p>
 
 <span class="n">println</span><span class="x">(</span><span class="s">"The 20-th fibonacci number is </span><span class="si">$</span><span class="s">(fibonacci(20))."</span><span class="x">)</span></code></pre></figure>
 
-<p>To run this script on one of the compute nodes we define a submission script <code class="highlighter-rouge">run_job.sh</code>:</p>
+<p>To run this script on one of the compute nodes we define a submission script <code class="language-plaintext highlighter-rouge">run_job.sh</code>:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#!/bin/bash</span>
 
@@ -245,10 +244,10 @@ To upload <code class="highlighter-rouge">dataset.csv</code> I simply type:</p>
 <span class="c">#SBATCH --mail-type=ALL</span>
 <span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
 
-<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia <span class="nt">--project</span> <span class="nt">-e</span> <span class="s1">'import Pkg; Pkg.instantiate();
 include("myscript.jl")'</span></code></pre></figure>
 
-<p>Lines starting with <code class="highlighter-rouge">#SBATCH</code> are SLURM commands. We request 5min of computation time on one CPU. We further want to run it on the ARC-HTC partition and get status updates about our job sent to our email.</p>
+<p>Lines starting with <code class="language-plaintext highlighter-rouge">#SBATCH</code> are SLURM commands. We request 5min of computation time on one CPU. We further want to run it on the ARC-HTC partition and get status updates about our job sent to our email.</p>
 
 <p>The last line in the script calls Julia, instantiates the 
 <span class="sidenote">
@@ -259,7 +258,7 @@ include("myscript.jl")'</span></code></pre></figure>
 Suggested reading: <a href="https://julialang.github.io/Pkg.jl/v1/environments/">Working with environments</a>.
 <span class="sidenote__content-parenthesis">)</span>
 </small>
-</span>i.e. installs any package dependencies defined in <code class="highlighter-rouge">Project.toml</code>, and runs our script.</p>
+</span>i.e. installs any package dependencies defined in <code class="language-plaintext highlighter-rouge">Project.toml</code>, and runs our script.</p>
 
 <p>We then submit the job using the shell with</p>
 
@@ -267,19 +266,19 @@ Suggested reading: <a href="https://julialang.github.io/Pkg.jl/v1/environments/"
 
 <p>Depending on the available resources the job is then queued and waiting for execution. You can look up the current job status with</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">squeue -u USERNAME</code></pre></figure>
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">squeue <span class="nt">-u</span> USERNAME</code></pre></figure>
 
 <p>To cancel the job use either of the two:</p>
 
-<figure class="highlight"><pre><code class="language-bash" data-lang="bash">scancel -j <span class="o">[</span>JOBNUMBER]
-scancel -u <span class="o">[</span>USERNAME]</code></pre></figure>
+<figure class="highlight"><pre><code class="language-bash" data-lang="bash">scancel <span class="nt">-j</span> <span class="o">[</span>JOBNUMBER]
+scancel <span class="nt">-u</span> <span class="o">[</span>USERNAME]</code></pre></figure>
 
 <h3 id="job-arrays">Job arrays</h3>
 <p>Sometimes we want to run the same job multiple times with only minor modifications, e.g. running our algorithm with one of the hyperparameters changed. For this case SLURM <a href="https://slurm.schedmd.com/job_array.html">job arrays</a> are quite useful. They execute the submission script multiple times and allow you to run different versions of the same script.
 The ability to run time-consuming jobs in parallel can be a big time saver.
-Let’s assume that we want to calculate the Fibonacci number for <code class="highlighter-rouge">n = 20, 30, 40</code> in separate jobs.</p>
+Let’s assume that we want to calculate the Fibonacci number for <code class="language-plaintext highlighter-rouge">n = 20, 30, 40</code> in separate jobs.</p>
 
-<p>To achieve this we add one line with an array command to our submission script <code class="highlighter-rouge">run_job.sh</code>:</p>
+<p>To achieve this we add one line with an array command to our submission script <code class="language-plaintext highlighter-rouge">run_job.sh</code>:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#!/bin/bash</span>
 
@@ -294,13 +293,13 @@ Let’s assume that we want to calculate the Fibonacci number for <code class="h
 <span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
 <span class="c">#SBATCH --array=1-3</span>
 
-<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia <span class="nt">--project</span> <span class="nt">-e</span> <span class="s1">'import Pkg; Pkg.instantiate();
 include("myscript.jl")'</span></code></pre></figure>
 
-<p>The job will now run three times. The array id is given by the environment variable<code class="highlighter-rouge">SLURM_ARRAY_TASK_ID</code> which we can use inside our Julia script to select <code class="highlighter-rouge">n</code>:</p>
+<p>The job will now run three times. The array id is given by the environment variable<code class="language-plaintext highlighter-rouge">SLURM_ARRAY_TASK_ID</code> which we can use inside our Julia script to select <code class="language-plaintext highlighter-rouge">n</code>:</p>
 
 <figure class="highlight"><pre><code class="language-julia" data-lang="julia"><span class="c"># get the environment variable</span>
-<span class="n">task_id</span> <span class="o">=</span> <span class="n">Base</span><span class="o">.</span><span class="n">parse</span><span class="x">(</span><span class="kt">Int</span><span class="x">,</span> <span class="n">ENV</span><span class="x">[</span><span class="s">"SLURM_ARRAY_TASK_ID"</span><span class="x">])</span>
+<span class="n">task_id</span> <span class="o">=</span> <span class="n">Base</span><span class="o">.</span><span class="n">parse</span><span class="x">(</span><span class="kt">Int</span><span class="x">,</span> <span class="nb">ENV</span><span class="x">[</span><span class="s">"SLURM_ARRAY_TASK_ID"</span><span class="x">])</span>
 <span class="n">n_arr</span> <span class="o">=</span> <span class="x">[</span><span class="mi">20</span><span class="x">;</span> <span class="mi">30</span><span class="x">;</span> <span class="mi">40</span><span class="x">]</span>
 <span class="n">n</span> <span class="o">=</span> <span class="n">n_arr</span><span class="x">[</span><span class="n">task_id</span><span class="x">]</span>
 
@@ -315,14 +314,14 @@ include("myscript.jl")'</span></code></pre></figure>
 <span class="n">println</span><span class="x">(</span><span class="s">"The </span><span class="si">$(n)-</span><span class="s">th fibonacci number is </span><span class="si">$</span><span class="s">(fibonacci(n))."</span><span class="x">)</span></code></pre></figure>
 
 <h3 id="multithreading">Multithreading</h3>
-<p>To use multithreading in our Julia script we have to request multiple cores on a computing node. The following script <code class="highlighter-rouge">my_multithreaded_script.jl</code> is used to compute the Fibonacci number for different <code class="highlighter-rouge">n</code> on
+<p>To use multithreading in our Julia script we have to request multiple cores on a computing node. The following script <code class="language-plaintext highlighter-rouge">my_multithreaded_script.jl</code> is used to compute the Fibonacci number for different <code class="language-plaintext highlighter-rouge">n</code> on
 <span class="sidenote">
 <input aria-label="Show sidenote" type="checkbox" id="sidenote__checkbox--6" class="sidenote__checkbox" />
 <label tabindex="0" title="" aria-describedby="sidenote-6" for="sidenote__checkbox--6" class="sidenote__button sidenote__button--number-6 ">parallel threads
 </label>:
 <small id="sidenote-6" class="sidenote__content sidenote__content--number-6">
 <span class="sidenote__content-parenthesis "> (sidenote: </span>
-This is not the best example for multithreading, because computing the Fibonacci number for the highest <code class="highlighter-rouge">n</code> computes the Fibonacci number for all lower <code class="highlighter-rouge">n</code> in the process.
+This is not the best example for multithreading, because computing the Fibonacci number for the highest <code class="language-plaintext highlighter-rouge">n</code> computes the Fibonacci number for all lower <code class="language-plaintext highlighter-rouge">n</code> in the process.
 <span class="sidenote__content-parenthesis">)</span>
 </small>
 </span></p>
@@ -342,7 +341,7 @@ This is not the best example for multithreading, because computing the Fibonacci
 
 <span class="c"># use multiple threads to compute the fibonacci number for each n in n_arr</span>
 <span class="n">fib</span> <span class="o">=</span> <span class="n">zeros</span><span class="x">(</span><span class="n">length</span><span class="x">(</span><span class="n">n_arr</span><span class="x">))</span>
-<span class="n">Threads</span><span class="o">.</span><span class="nd">@threads</span> <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span><span class="x">:</span><span class="n">length</span><span class="x">(</span><span class="n">n_arr</span><span class="x">)</span>
+<span class="n">Threads</span><span class="o">.</span><span class="nd">@threads</span> <span class="k">for</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span><span class="o">:</span><span class="n">length</span><span class="x">(</span><span class="n">n_arr</span><span class="x">)</span>
     <span class="n">fib</span><span class="x">[</span><span class="n">k</span><span class="x">]</span> <span class="o">=</span> <span class="n">fibonacci</span><span class="x">(</span><span class="n">n_arr</span><span class="x">[</span><span class="n">k</span><span class="x">])</span>
 <span class="k">end</span></code></pre></figure>
 
@@ -361,10 +360,10 @@ This is not the best example for multithreading, because computing the Fibonacci
 <span class="c">#SBATCH --mail-user=YOUR_EMAIL_ADDRESS</span>
 
 <span class="nb">export </span><span class="nv">JULIA_NUM_THREADS</span><span class="o">=</span>8
-<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia --project -e <span class="s1">'import Pkg; Pkg.instantiate();
+<span class="nv">$DATA</span>/julia-1.5.3-linux-x86_64/bin/julia <span class="nt">--project</span> <span class="nt">-e</span> <span class="s1">'import Pkg; Pkg.instantiate();
 include("my_multithreaded_script.jl")'</span></code></pre></figure>
 
-<p>The only changes are that we now request 8 cores on one node and export the environment variable <code class="highlighter-rouge">JULIA_NUM_THREADS</code> to start Julia with 8 threads.</p>
+<p>The only changes are that we now request 8 cores on one node and export the environment variable <code class="language-plaintext highlighter-rouge">JULIA_NUM_THREADS</code> to start Julia with 8 threads.</p>
 
 <h3 id="ensuring-consistent-results">Ensuring consistent results</h3>
 <p>Let’s assume that you want to benchmark your algorithm, e.g. measure its execution time. In order to generate consistent results from multiple runs, you have to make sure that the Julia script is executed on the same hardware every time. If no hardware is specified SLURM will just run the job on the next available node. If the node has eight CPUs and your job runs on four of them, then the performance of your job will depend on what other jobs run on the remaining four CPUs.</p>
@@ -380,7 +379,7 @@ There will still be some variance in your time measurement. If more accuracy is 
 </small>
 </span> you will have to specify the node hardware and request all the CPUs on a node. Information about the different nodes within the Oxford HTC partition can be found <a href="https://www.arc.ox.ac.uk/arcus-htc-reference-guide">here</a>.</p>
 
-<p>Let’s assume that we want to run our job on a SandyBridge E5-2650 (2GHz) node. We can request exclusive access to a whole node by using SLURM constraints. Just add the following lines to the <code class="highlighter-rouge">run_job.sh</code> submission script:</p>
+<p>Let’s assume that we want to run our job on a SandyBridge E5-2650 (2GHz) node. We can request exclusive access to a whole node by using SLURM constraints. Just add the following lines to the <code class="language-plaintext highlighter-rouge">run_job.sh</code> submission script:</p>
 
 <figure class="highlight"><pre><code class="language-bash" data-lang="bash"><span class="c">#SBATCH --constraint='cpu_sku:E5-2650'</span>
 <span class="c">#SBATCH --exclusive</span></code></pre></figure>
